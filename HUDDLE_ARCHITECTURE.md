@@ -9,15 +9,17 @@
 
 ## 1. Executive Summary
 
-**Huddle is bulk-purchase coordination for ordinary consumers, run by their personal agents over an encrypted P2P mesh.**
+**Huddle is a coalition layer for digital volume-tier pricing — agents pool buyer demand to cross thresholds the seller already prices for, settled atomically.**
 
-A user tells their agent *"I want a 65" LG OLED, budget $1,800, willing to wait 5 days."* The agent says nothing for three days, then surfaces: *"Found 14 other buyers — negotiated $1,520 each with Best Buy. Accept?"* One tap, done. The user never sees a wallet, a coalition, or the word "crypto."
+Most digital products already have volume discounts. AWS Reserved Instances and Savings Plans cut up to 72% off on-demand. Twilio shaves 30–40% per message at high volume. Figma Enterprise lands 20–35% under list. Vast.ai, CoreWeave, and Lambda Labs price reserved GPU at 30–60% off spot. The discount exists. It's just gated behind volume thresholds an individual buyer rarely crosses alone.
+
+A Huddle agent says nothing for a few minutes, then surfaces: *"14 other buyers want H100 hours this week — pooled together you all hit the next reservation tier, ~$32 saved per buyer. Accept?"* One tap, capability tokens issued atomically, each buyer draws down their slice from a single bulk reservation.
 
 **Why this wins:**
-- **Normie demo.** Three laptops, one tap, $840 saved on screen. Judges feel it instantly.
+- **Demo-able end-to-end.** Three laptops, one tap, real testnet x402 settlement, capability tokens issued atomically, savings shown live.
 - **Every sponsor is structurally load-bearing** — none are bolted on. Remove any one and the product breaks.
-- **The crypto layer is invisible.** It enables a discount that physically cannot exist without it.
-- **Bulk pricing is universal and daily.** B2B has had it forever; B2C has been blocked only by coordination cost. Agents collapse that cost to zero.
+- **The crypto layer is invisible.** The user's local agent runs the protocol; they see "your agent saved $X this month" — Rocket Money for AI infrastructure.
+- **The volume tiers already exist** — the protocol just lets small buyers reach them. No discount-invention required.
 
 ---
 
@@ -127,8 +129,8 @@ This is the cleanest possible "agents do something humans can't" pitch: **humans
 ### 3.3 Protocol — End-to-End
 
 **Phase 1: Intent commitment (~seconds)**
-1. User types intent into UI: `{product_id, max_price, deadline, qty}`.
-2. Buyer Agent normalizes the product to a canonical SKU hash `sku_h = H(product_id_normalized)`.
+1. User (or their agent autonomously) submits intent: `{sku, max_unit_price, deadline, qty}` — e.g. `{ "sku": "h100-pcie-hour", "max_unit_price": 1.80, "deadline": "+72h", "qty": 100 }`.
+2. Buyer Agent normalizes the SKU to a canonical hash `sku_h = H(sku_normalized)`.
 3. Agent posts a commitment `c = H(sku_h ‖ tier_bucket(max_price) ‖ deadline_bucket ‖ nonce)` over AXL gossip via `/send`. The cleartext intent never leaves the device.
 4. Tier and deadline are coarsened into buckets so distinct buyers produce identical commitments when their intents intersect.
 
@@ -157,7 +159,7 @@ This is the cleanest possible "agents do something humans can't" pitch: **humans
 - **Sellers see zero pre-coalition signal.** Intent commitments are hashes broadcast peer-to-peer, never reach a seller-controllable surface.
 - **Cleartext intents leak only inside an already-formed cluster of size ≥k.** A seller running a Sybil node sees only its own probe responses, not other buyers' intents.
 - **Buyer profile iNFT runs sealed.** Even the matching logic uses 0G Compute attested inference — a compromised app server cannot exfiltrate user preferences.
-- **Shipping addresses released onchain only at `Committed` state**, sealed-encrypted to seller's key.
+- **Capability tokens issued onchain at `Committed` state**, sealed-encrypted to each buyer's public key. The seller learns the coalition size and pooled payment; never which individual buyer redeems which slice.
 
 ---
 
@@ -258,7 +260,8 @@ ETHGlobal main-prize judging weighs four dimensions. Huddle's positioning on eac
 | KeeperHub contract semantics ambiguous for N-party | Med | High | Day-1 spike: write a 3-buyer minimal coalition + KeeperHub config; verify with KeeperHub team in Discord. $500 feedback bounty rewards exactly this kind of probing. |
 | 0G Compute sealed inference not stable | Med | Med | Fallback to local inference + 0G Storage. iNFT on 0G Chain still mints. |
 | x402 sandbox not ready or rate-limited | Low | Med | Mock x402 with deterministic simulator; toggle to real on demo day. |
-| Seller-side integration too thin (judges call it fake) | Med | Med | Stand up a self-built "seller agent" that runs its own AXL node and accepts coalition offers programmatically. Ships a CSV of orders. Looks real because it is real on our side. |
+| Seller-side integration looks mocked | Med | Med | Self-hosted seller reference implementation IS the architectural artifact, not a hack — mirrors real-world tier price cards (AWS RI / vast.ai shape) and accepts x402. Buyer-side protocol is the real product; seller surface is a thin interface future shims plug behind. |
+| Capability-token redemption looks mocked | Med | Med | Best mitigation: redeem against a Gensyn testnet compute endpoint (asked sponsor). Fallback: local LLM behind an HTTP API as redemption target — capability token gates real inference at demo time. |
 | Eight days is not enough | Med | High | Day-by-day plan (Section 7) with explicit cuts: the demo only needs Days 1–6 to ship; Days 7–8 are polish + recording. |
 
 ---
@@ -280,13 +283,13 @@ ETHGlobal main-prize judging weighs four dimensions. Huddle's positioning on eac
 
 ## 8. Demo Storyboard (3 minutes)
 
-| 0:00–0:20 | "I want a 65" LG OLED for under $1,800." Type into Huddle on laptop 1. Hit submit. |
-| 0:20–0:40 | Cut to laptop 2 and laptop 3 — same intent typed by demo-buyers in Berlin and São Paulo (real VPS, real AXL routing). Topology pane shows mesh discovery happening live. |
-| 0:40–1:10 | Coalition forms onscreen. Seller-agent (self-hosted, also real AXL node) returns tier price $1,520. All three buyers' devices show one-tap approve. |
-| 1:10–1:40 | Tap. KeeperHub atomic commit fires. Onchain explorer pops up showing `CoalitionCommitted`. Each laptop shows "Saved $280." |
+| 0:00–0:20 | "I need 100 H100-hours this week, max $1.80/hr." Type into Huddle on laptop 1. Hit submit. Agent gives no feedback — just listens. |
+| 0:20–0:40 | Cut to laptops 2 and 3 — similar intents typed by demo-buyers (real geo-distributed VPS, real AXL routing). Topology pane shows mesh discovery happening live. |
+| 0:40–1:10 | Coalition forms onscreen at k=3 threshold (lowered for demo). Self-hosted seller-agent (own AXL node, tier price card mirroring vast.ai / coreweave shape) returns reservation tier $1.30/hr (vs $1.80 each alone). All three devices show one-tap approve. |
+| 1:10–1:40 | Tap. KeeperHub atomic commit fires. Onchain explorer pops up showing `CoalitionCommitted`. Each laptop shows "Saved $50." Capability tokens land in each buyer's local agent — visibly. |
 | 1:40–2:10 | **Drop-out replay.** Re-run with laptop 3 disconnected mid-flow. KeeperHub fires `refundAll`. All buyers refunded automatically. *"That's why this needs onchain atomicity — Web2 cannot give you this guarantee."* |
-| 2:10–2:40 | Show the iNFT page on 0G explorer. *"That's the buyer's profile. They own it. They can transfer it. The seller never saw a single field of it."* |
-| 2:40–3:00 | Closer: *"Bulk pricing has existed in B2B since 1900. It's never reached you because finding 14 strangers who want the same TV this week is impossible — for humans. For agents, it's Tuesday."* |
+| 2:10–2:40 | Live redemption: laptop 1's agent uses its capability token against the actual compute endpoint (Gensyn testnet compute if available, otherwise a real GPU process behind our reference seller). One inference call runs, output appears. *"Not a stub. The capability token a coalition member receives is interchangeable with what an enterprise customer holds — just earned at coalition pricing."* |
+| 2:40–3:00 | Closer: *"Volume discounts on digital have always existed for buyers big enough to hit the threshold. Coalitions on an encrypted mesh let small buyers reach those same tiers — automatically, atomically, anonymously. AWS already prices for this. We just made it reachable."* |
 
 ---
 
@@ -301,4 +304,4 @@ Huddle is in a fourth bucket: **a consumer pain so universal it requires zero cr
 
 The cleanest summary of the pitch — for the user to use verbatim — is:
 
-> *"Bulk pricing was always a coordination problem, not a technology problem. Agents on an encrypted mesh make the coordination free. KeeperHub makes the settlement atomic. 0G makes the buyer's profile theirs. The user just gets a discount that wasn't supposed to exist."*
+> *"Volume discounts on digital have always existed — for buyers big enough to hit the threshold. Bulk pricing on AWS, on Twilio, on every GPU market. Agents on an encrypted mesh let small buyers cross those thresholds anonymously. KeeperHub makes the settlement atomic. 0G makes the buyer's profile theirs. The user just gets pricing they were never big enough to access alone."*

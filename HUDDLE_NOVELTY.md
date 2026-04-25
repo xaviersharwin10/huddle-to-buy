@@ -18,8 +18,10 @@ This document scans every category an investor or judge might hand-wave at as "i
 | Investment DAOs | Syndicate, PleasrDAO, FWB | Coordinating investment capital among self-selected members; not strangers buying retail goods |
 | NFT group buys | PartyBid, Party DAO | Coordinated *bidding* for one indivisible asset; not divisible bulk pricing on commodity goods |
 | Academic multi-agent negotiation | ECNPro, Bargaining Chips, ANEGMA | Papers, not products. None deployed at consumer scale. None on P2P encrypted mesh + atomic onchain commit. |
+| Cloud-cost optimizers | Vantage, Spot.io, ProsperOps | Optimize *one* customer's existing AWS bill — they don't pool *across* customers and structurally can't (the cloud provider sees them as one account). Huddle pools mutually-distrustful strangers across a volume threshold. |
+| Group SaaS plans | Family / team / enterprise subscriptions | Pre-existing relationships only (family, employer). No protocol for strangers to coalesce around a volume tier they each individually couldn't reach. |
 
-**No product on the market** combines: (a) strangers, (b) consumer goods, (c) k-anonymous demand discovery, (d) agent-led coalition formation, (e) onchain atomic settlement.
+**No product on the market** combines: (a) strangers, (b) digital goods with existing volume tiers, (c) k-anonymous demand discovery, (d) agent-led coalition formation, (e) onchain atomic settlement, (f) capability-token issuance per buyer.
 
 ---
 
@@ -140,11 +142,11 @@ The risk worth tracking is another OpenAgents team independently arriving at thi
 
 ## 9. One-line elevator answers (for the user to use verbatim)
 
-> **"Isn't this just Groupon?"** No. Groupon was a centralized matcher that took a rake and gave up on bulk power years ago. We replaced the matcher with an encrypted peer mesh, and atomic settlement removes the rake.
+> **"Isn't this just Groupon?"** Groupon was a centralized matcher for restaurant deals, took a rake, and gave up on bulk power years ago. Different substrate, different decade — we replaced the matcher with an encrypted peer mesh and aimed it at digital goods where bulk pricing already lives in the API.
 
-> **"Isn't this just agentic commerce?"** Existing agentic commerce protocols — ACP, UCP, x402 — assume one buyer per transaction. Huddle is the multi-buyer primitive that's missing from the stack.
+> **"Isn't this just agentic commerce?"** Existing protocols — ACP, UCP, x402 — assume one buyer per transaction. Huddle is the multi-buyer primitive that's missing. Especially load-bearing for digital goods where the volume tier already exists but no individual agent ever crosses it.
 
-> **"Isn't this just a DAO?"** DAOs coordinate people who already know each other. Huddle coordinates strangers who never will.
+> **"Isn't this just a DAO?"** DAOs coordinate people who already know each other. Huddle coordinates strangers who never will, matched only by the fact that they want the same digital tier on the same timeline.
 
 > **"Isn't this just academic?"** Multi-agent negotiation is academic. Huddle is the first time it composes with a P2P encrypted transport and onchain N-party atomicity — neither of which existed when those papers were written.
 
