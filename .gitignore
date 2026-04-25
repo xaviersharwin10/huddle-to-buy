@@ -1,0 +1,25 @@
+node_modules/
+dist/
+.env
+.env.local
+*.log
+
+# hardhat
+contracts/cache/
+contracts/artifacts/
+contracts/typechain-types/
+
+# axl
+axl/bin/
+axl/data/*
+!axl/data/.gitkeep
+axl/keys/
+
+# next
+web/.next/
+web/out/
+
+# editor
+.DS_Store
+.vscode/
+.idea/
