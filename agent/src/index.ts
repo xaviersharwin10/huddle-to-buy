@@ -6,6 +6,8 @@ import { SellerAgent } from "./seller.js";
 const AXL = process.env.AXL_API ?? "http://127.0.0.1:9002";
 const K = Number(process.env.K ?? "3");
 const SELLER_PEER_ID = process.env.SELLER_PEER_ID ?? null;
+const AUTO_FUND = (process.env.AUTO_FUND ?? "true").toLowerCase() === "true";
+const FUND_DELAY_MS = Number(process.env.FUND_DELAY_MS ?? "0");
 const KNOWN_PEERS = (process.env.KNOWN_PEERS ?? "")
   .split(",")
   .map((s) => s.trim())
@@ -19,6 +21,16 @@ env:
   SELLER_PEER_ID    seller's full pubkey (64 hex). Coordinator queries this peer for tier price.
   KNOWN_PEERS       comma-separated full pubkeys to broadcast to. Overrides /topology.tree.
                     Use this when Yggdrasil tree convergence is incomplete (hub-spoke topologies).
+  RPC_URL           EVM RPC for Day-5 coalition flow (e.g. Base Sepolia RPC)
+  CHAIN_ID          EVM chain id (default 84532)
+  PRIVATE_KEY       buyer/coordinator EOA used for deploy/fund txs
+  FACTORY_ADDRESS   deployed CoalitionFactory address
+  KEEPER_ADDRESS    keeper EOA authorized to call commit/refund
+  SELLER_ADDRESS    seller treasury address for committed payout
+  PAY_TOKEN_ADDRESS ERC20 payment token address (Base Sepolia USDC by default)
+  PAY_TOKEN_DECIMALS ERC20 decimals (default 6)
+  AUTO_FUND         auto-approve and fund coalition on coalition_ready (default true)
+  FUND_DELAY_MS     optional delay before fund tx, useful for replay timing tests
 
 commands:
   topology
@@ -41,6 +53,8 @@ async function main() {
         k: K,
         sellerPeerId: SELLER_PEER_ID,
         knownPeers: KNOWN_PEERS.length > 0 ? KNOWN_PEERS : null,
+        autoFund: AUTO_FUND,
+        fundDelayMs: FUND_DELAY_MS,
       });
       await agent.init();
 

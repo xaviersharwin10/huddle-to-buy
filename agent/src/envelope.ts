@@ -49,9 +49,19 @@ export type NegotiateRespEnv = {
   decline_reason?: string;
 };
 
+export type CoalitionReadyEnv = {
+  v: 1;
+  kind: "coalition_ready";
+  from: string;
+  commitment: string;
+  coalition_address: `0x${string}`;
+  chain_id: number;
+};
+
 export type Envelope =
   | CommitEnv
   | RevealReqEnv
   | RevealRespEnv
   | NegotiateReqEnv
-  | NegotiateRespEnv;
+  | NegotiateRespEnv
+  | CoalitionReadyEnv;

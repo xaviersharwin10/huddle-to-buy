@@ -1,5 +1,6 @@
 import { AxlClient } from "./axl.js";
 import type {
+  CoalitionReadyEnv,
   CommitEnv,
   Envelope,
   NegotiateReqEnv,
@@ -7,7 +8,15 @@ import type {
   RevealReqEnv,
   RevealRespEnv,
 } from "./envelope.js";
-import { commitment, type Intent, newNonce } from "./intent.js";
+import {
+  createOnchainConfigFromEnv,
+  deployCoalition,
+  fundCoalitionForBuyer,
+  toTokenUnits,
+  type OnchainConfig,
+} from "./chain.js";
+import { canonicalSku, commitment, type Intent, newNonce } from "./intent.js";
+import { keccak256, toHex } from "viem";
 import { IntentObserver } from "./observer.js";
 
 export type ClusterState = {
@@ -18,6 +27,8 @@ export type ClusterState = {
   // Day-4 negotiation state:
   negotiateSent?: boolean;
   offer?: { tierUnitPrice: number; validUntilMs: number };
+  coalitionAddress?: `0x${string}`;
+  fundedByMe?: boolean;
 };
 
 type Logger = (s: string) => void;
@@ -27,6 +38,9 @@ export type HuddleAgentOptions = {
   sellerPeerId?: string | null;
   /** Optional override for broadcast peers. If null, falls back to /topology.tree. */
   knownPeers?: string[] | null;
+  onchain?: OnchainConfig | null;
+  autoFund?: boolean;
+  fundDelayMs?: number;
   log?: Logger;
 };
 
@@ -40,12 +54,18 @@ export class HuddleAgent {
   private readonly k: number;
   private readonly sellerPeerId: string | null;
   private readonly knownPeers: string[] | null;
+  private readonly onchain: OnchainConfig | null;
+  private readonly autoFund: boolean;
+  private readonly fundDelayMs: number;
   private readonly log: Logger;
 
   constructor(private readonly axl: AxlClient, opts: HuddleAgentOptions = {}) {
     this.k = opts.k ?? 3;
     this.sellerPeerId = opts.sellerPeerId ?? null;
     this.knownPeers = opts.knownPeers ?? null;
+    this.onchain = opts.onchain ?? createOnchainConfigFromEnv();
+    this.autoFund = opts.autoFund ?? true;
+    this.fundDelayMs = opts.fundDelayMs ?? 0;
     this.log = opts.log ?? console.log;
     this.observer = new IntentObserver(24 * 60 * 60 * 1000, this.k);
   }
@@ -63,6 +83,14 @@ export class HuddleAgent {
     const t = await this.axl.topology();
     this.myPeerId = t.our_public_key;
     this.log(`agent init: pubkey=${short(this.myPeerId)}${this.sellerPeerId ? `  seller=${short(this.sellerPeerId)}` : ""}`);
+    if (this.onchain) {
+      this.log(
+        `onchain: enabled chain=${this.onchain.chainId} factory=${shortAddr(this.onchain.factoryAddress)} token=${shortAddr(this.onchain.payTokenAddress)}`,
+      );
+      this.log(`onchain: autoFund=${this.autoFund} fundDelayMs=${this.fundDelayMs}`);
+    } else {
+      this.log("onchain: disabled (set RPC_URL, PRIVATE_KEY, FACTORY_ADDRESS, KEEPER_ADDRESS, SELLER_ADDRESS, PAY_TOKEN_ADDRESS)");
+    }
   }
 
   async submit(intent: Intent): Promise<string> {
@@ -113,6 +141,7 @@ export class HuddleAgent {
       case "reveal_response":    await this.onRevealResponse(env); break;
       case "negotiate_request":  this.log(`drop negotiate_request — buyer agent doesn't sell`); break;
       case "negotiate_response": await this.onNegotiateResponse(env); break;
+      case "coalition_ready":    await this.onCoalitionReady(env); break;
     }
     return true;
   }
@@ -249,6 +278,108 @@ export class HuddleAgent {
     const totalSaved = savedPerBuyer * env.n_buyers;
     const expiryS = Math.round((env.valid_until_ms - Date.now()) / 1000);
     this.log(`*** SELLER OFFER c=${short(env.commitment)}: $${env.tier_unit_price}/unit × ${env.unit_qty} × ${env.n_buyers}; saved $${savedPerBuyer.toFixed(2)}/buyer ($${totalSaved.toFixed(2)} total); valid ${expiryS}s ***`);
+
+    await this.maybeDeployCoalition(env);
+  }
+
+  private async maybeDeployCoalition(env: NegotiateRespEnv): Promise<void> {
+    const cluster = this.clusters.get(env.commitment);
+    if (!cluster || cluster.coordinator !== this.myPeerId) return;
+    if (cluster.coalitionAddress) return;
+    if (!this.onchain) {
+      this.log("(onchain disabled — skipping coalition deployment)");
+      return;
+    }
+
+    const skuHash = keccak256(toHex(canonicalSku(env.sku)));
+    try {
+      const coalitionAddress = await deployCoalition({
+        cfg: this.onchain,
+        skuHash,
+        tierUnitPrice: toTokenUnits(env.tier_unit_price!, this.onchain.payTokenDecimals),
+        unitQty: env.unit_qty,
+        requiredBuyers: env.n_buyers,
+        validUntilMs: env.valid_until_ms!,
+      });
+
+      cluster.coalitionAddress = coalitionAddress;
+      this.log(`*** COALITION DEPLOYED c=${short(env.commitment)}: ${coalitionAddress} ***`);
+
+      const ready: CoalitionReadyEnv = {
+        v: 1,
+        kind: "coalition_ready",
+        from: this.myPeerId,
+        commitment: env.commitment,
+        coalition_address: coalitionAddress,
+        chain_id: this.onchain.chainId,
+      };
+
+      for (const peer of cluster.members.keys()) {
+        if (peer === this.myPeerId) continue;
+        try {
+          await this.axl.send(peer, JSON.stringify(ready));
+          this.log(`  -> coalition_ready to ${short(peer)}`);
+        } catch (e) {
+          this.log(`  ! coalition_ready to ${short(peer)} failed: ${(e as Error).message}`);
+        }
+      }
+
+      await this.maybeFundCoalition(env.commitment, coalitionAddress);
+    } catch (e) {
+      this.log(`  ! coalition deployment failed: ${(e as Error).message}`);
+    }
+  }
+
+  private async onCoalitionReady(env: CoalitionReadyEnv): Promise<void> {
+    const cluster = this.clusters.get(env.commitment);
+    if (!cluster) {
+      this.log(`drop coalition_ready c=${short(env.commitment)} — unknown cluster`);
+      return;
+    }
+    if (cluster.coordinator && env.from !== cluster.coordinator) {
+      this.log(`drop coalition_ready c=${short(env.commitment)} — sender is not coordinator`);
+      return;
+    }
+
+    cluster.coalitionAddress = env.coalition_address;
+    this.log(`coalition_ready c=${short(env.commitment)} addr=${env.coalition_address} chain=${env.chain_id}`);
+    await this.maybeFundCoalition(env.commitment, env.coalition_address);
+  }
+
+  private async maybeFundCoalition(
+    commitmentKey: string,
+    coalitionAddress: `0x${string}`,
+  ): Promise<void> {
+    const cluster = this.clusters.get(commitmentKey);
+    if (!cluster || !cluster.members.has(this.myPeerId)) return;
+    if (cluster.fundedByMe) return;
+    if (!this.onchain) {
+      this.log("(onchain disabled — skipping fund)");
+      return;
+    }
+    if (!this.autoFund) {
+      this.log("(AUTO_FUND=false — skipping fund for drop-out replay)");
+      return;
+    }
+
+    if (this.fundDelayMs > 0) {
+      this.log(`fund: delaying ${this.fundDelayMs}ms before approve+fund`);
+      await sleep(this.fundDelayMs);
+    }
+
+    try {
+      const { approveTx, fundTx } = await fundCoalitionForBuyer({
+        cfg: this.onchain,
+        coalitionAddress,
+      });
+      if (approveTx) {
+        this.log(`fund: approve tx=${approveTx}`);
+      }
+      this.log(`fund: success tx=${fundTx}`);
+      cluster.fundedByMe = true;
+    } catch (e) {
+      this.log(`  ! fund failed: ${(e as Error).message}`);
+    }
   }
 
   private cluster(c: string): ClusterState {
@@ -263,4 +394,12 @@ export class HuddleAgent {
 
 function short(id: string): string {
   return id.slice(0, 12) + "…";
+}
+
+function shortAddr(addr: string): string {
+  return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }

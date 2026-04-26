@@ -6,10 +6,13 @@
     "build": "hardhat compile",
     "typecheck": "tsc --noEmit",
     "test": "hardhat test",
-    "deploy:base-sepolia": "hardhat run scripts/deploy.ts --network baseSepolia"
+    "deploy:base-sepolia": "hardhat run scripts/deploy.ts --network baseSepolia",
+    "keeper:watch": "hardhat run scripts/keeper.ts --network baseSepolia",
+    "keeperhub:register": "hardhat run scripts/keeperhub-register.ts --network baseSepolia"
   },
   "dependencies": {
-    "@openzeppelin/contracts": "^5.1.0"
+    "@openzeppelin/contracts": "^5.1.0",
+    "ethers": "^6.16.0"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox": "^5.0.0",

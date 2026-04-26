@@ -4,7 +4,11 @@ import { ethers, network } from "hardhat";
 // Override via PAY_TOKEN env if deploying elsewhere.
 
 async function main() {
-  const [deployer] = await ethers.getSigners();
+  const signers = await ethers.getSigners();
+  if (signers.length === 0) {
+    throw new Error("No deployer signer found. Set PRIVATE_KEY in contracts/.env for baseSepolia network.");
+  }
+  const [deployer] = signers;
   console.log(`network: ${network.name}`);
   console.log(`deployer: ${deployer.address}`);
   console.log(`balance:  ${ethers.formatEther(await ethers.provider.getBalance(deployer.address))} ETH`);

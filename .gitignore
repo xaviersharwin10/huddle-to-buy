@@ -2,6 +2,12 @@ node_modules/
 dist/
 .env
 .env.local
+.env.*
+agent/.env.buyer*
+contracts/.env.*
+!contracts/.env.example
+!contracts/.env.base-sepolia.example
+!agent/.env.base-sepolia.example
 *.log
 
 # hardhat
