@@ -58,7 +58,7 @@ export class SellerAgent {
   constructor(
     private readonly axl: AxlClient,
     private readonly log: (s: string) => void = console.log,
-    private readonly offerValidForMs = 5 * 60 * 1000,
+    private readonly offerValidForMs = 30 * 60 * 1000,
   ) {}
 
   async init(): Promise<void> {
