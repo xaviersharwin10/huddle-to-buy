@@ -5,6 +5,7 @@ import {
   http,
   parseUnits,
 } from "viem";
+import { baseSepolia } from "viem/chains";
 import { privateKeyToAccount } from "viem/accounts";
 
 const FACTORY_ABI = [
@@ -143,9 +144,11 @@ export async function deployCoalition(args: {
   const account = privateKeyToAccount(cfg.privateKey);
   const wallet = createWalletClient({
     account,
+    chain: baseSepolia,
     transport: http(cfg.rpcUrl),
   });
   const publicClient = createPublicClient({
+    chain: baseSepolia,
     transport: http(cfg.rpcUrl),
   });
 
@@ -163,7 +166,7 @@ export async function deployCoalition(args: {
       cfg.keeperAddress,
       cfg.payTokenAddress,
     ],
-    chain: null,
+    gas: 1000000n, // 1M gas limit for coalition creation + contract deployment
   });
 
   const receipt = await publicClient.waitForTransactionReceipt({ hash });
@@ -190,18 +193,35 @@ export async function fundCoalitionForBuyer(args: {
 
   const wallet = createWalletClient({
     account,
+    chain: baseSepolia,
     transport: http(cfg.rpcUrl),
   });
   const publicClient = createPublicClient({
+    chain: baseSepolia,
     transport: http(cfg.rpcUrl),
   });
 
-  const slice = await publicClient.readContract({
-    address: coalitionAddress,
-    abi: COALITION_ABI,
-    functionName: "unitPriceTotal",
-    args: [],
-  });
+  // Retry logic for RPC indexing delays
+  let slice: bigint | undefined;
+  for (let i = 0; i < 5; i++) {
+    try {
+      slice = await publicClient.readContract({
+        address: coalitionAddress,
+        abi: COALITION_ABI,
+        functionName: "unitPriceTotal",
+        args: [],
+      });
+      break;
+    } catch (e) {
+      if (i < 4) {
+        await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1s before retry
+      } else {
+        throw e;
+      }
+    }
+  }
+
+  if (!slice) throw new Error("Failed to get unitPriceTotal");
 
   const currentAllowance = await publicClient.readContract({
     address: cfg.payTokenAddress,
@@ -217,7 +237,7 @@ export async function fundCoalitionForBuyer(args: {
       abi: ERC20_ABI,
       functionName: "approve",
       args: [coalitionAddress, slice],
-      chain: null,
+      gas: 100000n, // Reasonable gas for ERC20 approve
     });
     await publicClient.waitForTransactionReceipt({ hash: approveTx });
   }
@@ -227,7 +247,7 @@ export async function fundCoalitionForBuyer(args: {
     abi: COALITION_ABI,
     functionName: "fund",
     args: [],
-    chain: null,
+    gas: 500000n, // Reasonable gas for Coalition.fund() call
   });
 
   await publicClient.waitForTransactionReceipt({ hash: fundTx });
