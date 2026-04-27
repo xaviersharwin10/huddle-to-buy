@@ -88,6 +88,15 @@ export class HuddleAgent {
         `onchain: enabled chain=${this.onchain.chainId} factory=${shortAddr(this.onchain.factoryAddress)} token=${shortAddr(this.onchain.payTokenAddress)}`,
       );
       this.log(`onchain: autoFund=${this.autoFund} fundDelayMs=${this.fundDelayMs}`);
+      
+      // Day 6: Profile testnet mock call
+      try {
+        const { mintBuyerProfile0G } = await import("./chain.js");
+        const receipt = await mintBuyerProfile0G(this.onchain, `0g://sealed-preference/${this.myPeerId}`);
+        this.log(`0G iNFT mint tx: ${receipt}`);
+      } catch (e) {
+        this.log(`0G mint error: ${(e as Error).message}`);
+      }
     } else {
       this.log("onchain: disabled (set RPC_URL, PRIVATE_KEY, FACTORY_ADDRESS, KEEPER_ADDRESS, SELLER_ADDRESS, PAY_TOKEN_ADDRESS)");
     }

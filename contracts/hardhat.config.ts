@@ -12,6 +12,7 @@ const config: HardhatUserConfig = {
     version: "0.8.24",
     settings: {
       optimizer: { enabled: true, runs: 200 },
+      evmVersion: "paris"
     },
   },
   networks: {
@@ -19,6 +20,11 @@ const config: HardhatUserConfig = {
       url: BASE_SEPOLIA_RPC,
       accounts: PRIVATE_KEY ? [PRIVATE_KEY] : [],
       chainId: 84532,
+    },
+    zeroGTestnet: {
+      url: "https://evmrpc-testnet.0g.ai",
+      accounts: PRIVATE_KEY ? [PRIVATE_KEY] : [],
+      chainId: 16600,
     },
   },
 };

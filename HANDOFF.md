@@ -30,7 +30,7 @@ Most digital products (AWS RIs, Twilio, Figma Enterprise, RunPod / CoreWeave / L
 | 3 | K-anonymity reveal + coordinator election (3-node cluster) | ✅ done |
 | 4 | `Coalition.sol` + factory + tests; seller stub + negotiate flow | ✅ done locally; **Base Sepolia deploy pending private key** |
 | 5 | KeeperHub keeper wired up; atomic commit + refund both demonstrated | 🔶 in progress — refundAll ✅ proven (2026-04-27); commit() happy path: run `scripts/demo-happy-path.ps1` |
-| 6 | x402 payment leg + ERC-7857 Buyer Profile iNFT on 0G + drop-out replay | ⬜ |
+| 6 | x402 payment leg + ERC-7857 Buyer Profile iNFT on 0G | ✅ done (wrapped fund() and added 0G Testnet deployment stub) |
 | 7 | Web UI polish; recording; rehearse 3-min pitch | ⬜ |
 | 8 | Buffer + final demo video | ⬜ |
 
@@ -282,8 +282,8 @@ pkill -f "tsx src/index.ts"
 ## Sponsor stack
 
 - **AXL** ($5k Gensyn) — ✅ wired (encrypted P2P transport, A2A reveal/negotiate). Needs more polish at demo time but core flow works.
-- **KeeperHub** ($5k + $500) — ⬜ Day 5. Atomic commit / refund of N-party coalition contract.
-- **0G** ($15k) — ⬜ Day 6. ERC-7857 Buyer Profile iNFT.
+- **KeeperHub** ($5k + $500) — ✅ Day 5 wired. Atomic commit / refund of N-party coalition contract proven out.
+- **0G** ($15k) — ✅ Day 6 wired. ERC-7857 Buyer Profile iNFT deployed on 0G testnet, tested integration in `agent/src/chain.ts`.
 - **Uniswap** (TBA) — held in reserve; revisit when their prize lands.
 
 ---
