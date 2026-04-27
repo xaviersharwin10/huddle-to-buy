@@ -29,7 +29,7 @@ Most digital products (AWS RIs, Twilio, Figma Enterprise, RunPod / CoreWeave / L
 | 2 | Intent commitment protocol (hash, gossip, sliding-window observer) | ✅ done |
 | 3 | K-anonymity reveal + coordinator election (3-node cluster) | ✅ done |
 | 4 | `Coalition.sol` + factory + tests; seller stub + negotiate flow | ✅ done locally; **Base Sepolia deploy pending private key** |
-| 5 | KeeperHub keeper wired up; atomic commit + refund both demonstrated | ⬜ next |
+| 5 | KeeperHub keeper wired up; atomic commit + refund both demonstrated | 🔶 in progress — refundAll ✅ proven (2026-04-27); commit() happy path: run `scripts/demo-happy-path.ps1` |
 | 6 | x402 payment leg + ERC-7857 Buyer Profile iNFT on 0G + drop-out replay | ⬜ |
 | 7 | Web UI polish; recording; rehearse 3-min pitch | ⬜ |
 | 8 | Buffer + final demo video | ⬜ |
@@ -248,6 +248,15 @@ The lex-smallest agent (= coordinator) should log:
 - `axl/scripts/smoke.sh` — Day 1 round-trip test.
 - `axl/upstream/` — gitignored; clone Gensyn's AXL there before building.
 - `axl/bin/node` — gitignored; built binary lives here.
+
+---
+
+### Scripts (PowerShell — run from repo root)
+
+- `scripts/demo-happy-path.ps1` — Full P0 happy path: kills stale procs, restarts nodes, launches seller+3 buyers in separate windows, prompts for coalition address, runs keeper → `commit()`.
+- `scripts/demo-dropout-replay.ps1` — P1 drop-out replay: same as above but buyer3 has `AUTO_FUND=false`; keeper fires `refundAll()` after `validUntil`.
+- `scripts/start-nodes.ps1` — Just starts the 4 AXL nodes (helper, called by the demo scripts).
+- `contracts/scripts/fund-buyer.ts` — One-shot fund script: `PRIVATE_KEY=... COALITION_ADDRESS=... pnpm exec tsx contracts/scripts/fund-buyer.ts` from `agent/` dir.
 
 ---
 
