@@ -122,7 +122,7 @@ export default function Dashboard() {
         (gState === "revealing" || gState === "broadcasting" && agentsState.buyer1?.myCommits?.[0]) ? 1 : 0;
 
      const WorkflowNode = ({ title, icon: Icon, sub, active, done, delay }: any) => (
-        <div className={`workflow-node ${active ? 'active-node' : done ? 'done-node' : 'pending-node'} animate-fade-in`} style={{ animationDelay: delay, display: 'flex', flexDirection: 'column', width: '200px', background: active ? 'rgba(99, 102, 241, 0.15)' : 'var(--card-bg)', border: `1px solid ${active ? '#6366f1' : done ? '#10b981' : 'var(--card-border)'}`, borderRadius: '12px', padding: '1rem', position: 'relative', zIndex: 2, transition: 'all 0.3s', boxShadow: active ? '0 0 20px rgba(99, 102, 241, 0.3)' : 'none' }}>
+        <div className={`workflow-node ${active ? 'active-node' : done ? 'done-node' : 'pending-node'} animate-fade-in`} style={{ animationDelay: delay, display: 'flex', flexDirection: 'column', width: '140px', flexShrink: 0, background: active ? 'rgba(99, 102, 241, 0.15)' : 'var(--card-bg)', border: `1px solid ${active ? '#6366f1' : done ? '#10b981' : 'var(--card-border)'}`, borderRadius: '10px', padding: '0.75rem', position: 'relative', zIndex: 2, transition: 'all 0.3s', boxShadow: active ? '0 0 20px rgba(99, 102, 241, 0.3)' : 'none' }}>
            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem' }}>
               <div style={{ background: active ? '#6366f1' : done ? '#10b981' : '#3f3f46', width: '32px', height: '32px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.3s' }}>
                  <Icon size={16} color="#ffffff" />
@@ -146,7 +146,7 @@ export default function Dashboard() {
               .workflow-node { box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
               .active-node { transform: translateY(-4px); }
            `}} />
-           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', minWidth: '800px' }}>
+           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', minWidth: '620px' }}>
               <WorkflowNode title="1. Buyer Node" icon={Play} sub="Local Agent signs bulk-buying intent locally." done={stageIndex > 0} active={stageIndex === 1} delay="0s" />
               <Connector done={stageIndex > 1} active={stageIndex === 1} />
               <WorkflowNode title="2. P2P Mesh (k=3)" icon={Activity} sub="AXL Encrypted Tunnel discovers & groups peers." done={stageIndex > 1} active={stageIndex === 2} delay="0.1s" />
@@ -344,37 +344,192 @@ export default function Dashboard() {
         </nav>
       </aside>
 
-      {/* Main Content */}
-      <main className="container" style={{ flex: 1, paddingRight: '4rem', overflowY: 'auto', maxHeight: '100vh' }}>
-        <div className="bg-blobs">
-          <div className="blob blob-1"></div>
-          <div className="blob blob-2"></div>
-        </div>
+      {/* Main Content & Terminal Layout Container */}
+      <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
         
-        <header className="header animate-fade-in" style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <h1 className="header-title">{activeTab.name} View</h1>
-            <div className="agent-info" style={{ color: '#a1a1aa', fontWeight: 500, marginTop: '0.5rem' }}>
-              {agentsState[activeTab.id] ? (
-                 <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                   <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', background: '#10b981' }}></span> 
-                   Agent Sync Active (Port: {activeTab.port})
-                 </span>
-              ) : (
-                 <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                   <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', background: '#f43f5e' }}></span> 
-                   Agent Offline
-                 </span>
-              )}
-            </div>
+        {/* Center Canvas */}
+        <main className="container" style={{ flex: 1, paddingRight: '2rem', overflowY: 'auto', maxHeight: '100vh' }}>
+          <div className="bg-blobs">
+            <div className="blob blob-1"></div>
+            <div className="blob blob-2"></div>
           </div>
-        </header>
+          
+          <header className="header animate-fade-in" style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <h1 className="header-title">{activeTab.name} View</h1>
+              <div className="agent-info" style={{ color: '#a1a1aa', fontWeight: 500, marginTop: '0.5rem' }}>
+                {agentsState[activeTab.id] ? (
+                   <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                     <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', background: '#10b981' }}></span> 
+                     Agent Sync Active (Port: {activeTab.port})
+                   </span>
+                ) : (
+                   <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                     <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', background: '#f43f5e' }}></span> 
+                     Agent Offline
+                   </span>
+                )}
+              </div>
+            </div>
+          </header>
 
-        {renderAgentWorkflow()}
-        {renderActiveTabContent()}
+          {renderAgentWorkflow()}
+          {renderActiveTabContent()}
 
-      </main>
+        </main>
+
+        {/* Right Sidebar - Interactive Terminal */}
+        <TerminalPanel
+          activeTab={activeTab}
+          agentState={agentsState[activeTab.id]}
+          paymentComplete={paymentComplete}
+          onReset={() => { setPaymentComplete(false); setSimulating(false); setKeeperRunning(false); }}
+        />
+
+      </div>
     </div>
+  );
+}
+
+// ─── Terminal Panel Component ─────────────────────────────────────────────────
+function TerminalPanel({ activeTab, agentState, paymentComplete, onReset }: any) {
+  const [agentRunning, setAgentRunning] = useState(false);
+  const [localSku, setLocalSku] = useState("h100-pcie-hour");
+  const [localPrice, setLocalPrice] = useState("1.5");
+  const [localQty, setLocalQty] = useState("10");
+  const [posting, setPosting] = useState(false);
+  const [cmdLog, setCmdLog] = useState<string[]>([]);
+  const logsEndRef = (el: HTMLDivElement | null) => el?.scrollIntoView({ behavior: "smooth" });
+
+  const addLog = (msg: string) => setCmdLog(prev => [...prev.slice(-49), `[${new Date().toISOString().substring(11, 19)}] ${msg}`]);
+
+  const handleStartAgent = async () => {
+    setAgentRunning(true);
+    addLog(`$ Spawning daemon for ${activeTab.name} on port ${activeTab.port}...`);
+    try {
+      const res = await fetch("/api/spawn", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ agentId: activeTab.id, port: activeTab.port, type: activeTab.type })
+      });
+      const data = await res.json();
+      if (data.success) addLog(`✓ Agent daemon started. PID: ${data.pid ?? "OK"}`);
+      else { addLog(`✗ Failed: ${data.error}`); setAgentRunning(false); }
+    } catch(e) {
+      addLog(`✗ API error: ${(e as Error).message}`);
+      setAgentRunning(false);
+    }
+  };
+
+  const handleStopAgent = async () => {
+    addLog(`$ Sending SIGTERM to ${activeTab.name} daemon (port ${activeTab.port})...`);
+    try {
+      await fetch("/api/spawn", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ port: activeTab.port })
+      });
+      addLog(`✓ Agent stopped.`);
+      setAgentRunning(false);
+    } catch(e) {
+      addLog(`✗ Stop failed: ${(e as Error).message}`);
+    }
+  };
+
+  const handlePostIntent = async () => {
+    if (!agentState) { addLog("✗ Agent offline — start it first."); return; }
+    setPosting(true);
+    const intent = { sku: localSku, max_unit_price: Number(localPrice), qty: Number(localQty), deadline_ms: Date.now() + 24 * 3600 * 1000 };
+    addLog(`$ POST http://localhost:${activeTab.port}/submit`);
+    addLog(`  body: ${JSON.stringify(intent)}`);
+    try {
+      const res = await fetch(`http://localhost:${activeTab.port}/submit`, {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(intent)
+      });
+      const data = await res.json();
+      if (data.success) addLog(`✓ Intent accepted by agent. Propagating to AXL mesh...`);
+      else addLog(`✗ Agent rejected: ${JSON.stringify(data)}`);
+    } catch(e) {
+      addLog(`✗ Fetch error: ${(e as Error).message}`);
+    }
+    setPosting(false);
+  };
+
+  const handleReset = () => {
+    addLog("$ Clearing session state. Ready for new round.");
+    onReset();
+  };
+
+  const isOnline = !!agentState;
+  const isBuyer = activeTab.type === "buyer";
+  const daemonLogs: string[] = agentState?.logs ?? [];
+  const combinedLogs = [...cmdLog, ...daemonLogs];
+
+  return (
+    <aside style={{ width: '420px', background: '#030305', borderLeft: '1px solid #1f1f2e', display: 'flex', flexDirection: 'column', height: '100vh', boxShadow: '-10px 0 30px rgba(0,0,0,0.6)' }}>
+      {/* Title bar */}
+      <div style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #1f1f2e', background: '#0a0a0f', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <div style={{ display: 'flex', gap: '5px' }}>
+            <div style={{ width: '11px', height: '11px', borderRadius: '50%', background: '#f43f5e' }}></div>
+            <div style={{ width: '11px', height: '11px', borderRadius: '50%', background: '#eab308' }}></div>
+            <div style={{ width: '11px', height: '11px', borderRadius: '50%', background: '#10b981' }}></div>
+          </div>
+          <span style={{ color: '#8b8b99', fontSize: '0.75rem', fontFamily: 'monospace', fontWeight: 700, marginLeft: '4px' }}>
+            {activeTab.name.toUpperCase()} // LIVE CONSOLE
+          </span>
+        </div>
+        <span style={{ fontSize: '0.65rem', fontFamily: 'monospace', padding: '2px 8px', borderRadius: '4px', background: isOnline ? 'rgba(16,185,129,0.15)' : 'rgba(244,63,94,0.15)', color: isOnline ? '#10b981' : '#f43f5e', border: `1px solid ${isOnline ? '#10b981' : '#f43f5e'}` }}>
+          {isOnline ? "● ONLINE" : "○ OFFLINE"}
+        </span>
+      </div>
+
+      {/* Agent controls */}
+      <div style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #1f1f2e', background: '#05050a', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+        {!isOnline ? (
+          <button onClick={handleStartAgent} style={{ flex: 1, padding: '0.5rem', background: 'rgba(99,102,241,0.15)', border: '1px solid #6366f1', color: '#818cf8', borderRadius: '6px', cursor: 'pointer', fontFamily: 'monospace', fontSize: '0.75rem', fontWeight: 700 }}>
+            ▶ Start Agent
+          </button>
+        ) : (
+          <button onClick={handleStopAgent} style={{ flex: 1, padding: '0.5rem', background: 'rgba(244,63,94,0.1)', border: '1px solid #f43f5e', color: '#fb7185', borderRadius: '6px', cursor: 'pointer', fontFamily: 'monospace', fontSize: '0.75rem', fontWeight: 700 }}>
+            ■ Stop Agent
+          </button>
+        )}
+        {paymentComplete && (
+          <button onClick={handleReset} style={{ flex: 1, padding: '0.5rem', background: 'rgba(234,179,8,0.1)', border: '1px solid #eab308', color: '#facc15', borderRadius: '6px', cursor: 'pointer', fontFamily: 'monospace', fontSize: '0.75rem', fontWeight: 700 }}>
+            ↺ New Round
+          </button>
+        )}
+      </div>
+
+      {/* Live log stream */}
+      <div style={{ flex: 1, padding: '0.75rem 1rem', overflowY: 'auto', fontFamily: 'monospace', fontSize: '0.78rem', lineHeight: 1.6, color: '#10b981' }}>
+        {combinedLogs.length === 0 && (
+          <p style={{ color: '#555', fontStyle: 'italic' }}>Awaiting daemon output...</p>
+        )}
+        {combinedLogs.map((log, idx) => (
+          <div key={idx} style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all', marginBottom: '4px', color: log.startsWith("[") ? '#10b981' : '#a3e635' }}>
+            <span style={{ color: '#0ea5e9', marginRight: '6px' }}>{">"}</span>{log}
+          </div>
+        ))}
+        <div ref={logsEndRef} />
+      </div>
+
+      {/* Intent Command Input (buyers only) */}
+      {isBuyer && (
+        <div style={{ padding: '1rem', borderTop: '1px solid #1f1f2e', background: '#0a0a0f', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+          <p style={{ color: '#555', fontSize: '0.7rem', fontFamily: 'monospace', marginBottom: '0.25rem' }}>$ post_intent --agent {activeTab.id}</p>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.4rem' }}>
+            <input value={localSku} onChange={e => setLocalSku(e.target.value)} placeholder="SKU" style={{ background: '#111', border: '1px solid #333', color: '#10b981', borderRadius: '4px', padding: '0.4rem', fontFamily: 'monospace', fontSize: '0.72rem' }} />
+            <input value={localPrice} onChange={e => setLocalPrice(e.target.value)} type="number" placeholder="Max $" style={{ background: '#111', border: '1px solid #333', color: '#10b981', borderRadius: '4px', padding: '0.4rem', fontFamily: 'monospace', fontSize: '0.72rem' }} />
+            <input value={localQty} onChange={e => setLocalQty(e.target.value)} type="number" placeholder="Qty" style={{ background: '#111', border: '1px solid #333', color: '#10b981', borderRadius: '4px', padding: '0.4rem', fontFamily: 'monospace', fontSize: '0.72rem' }} />
+          </div>
+          <button onClick={handlePostIntent} disabled={posting || !isOnline} style={{ padding: '0.5rem', background: posting ? 'rgba(16,185,129,0.1)' : 'rgba(16,185,129,0.15)', border: '1px solid #10b981', color: '#10b981', borderRadius: '6px', cursor: isOnline ? 'pointer' : 'not-allowed', fontFamily: 'monospace', fontSize: '0.75rem', fontWeight: 700 }}>
+            {posting ? "Posting..." : "$ post intent →"}
+          </button>
+        </div>
+      )}
+    </aside>
   );
 }
 

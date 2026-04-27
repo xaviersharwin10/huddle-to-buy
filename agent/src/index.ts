@@ -38,6 +38,20 @@ commands:
   seller                                                  run as seller — listen for negotiate_request, respond with tier price
 `;
 
+const STREAM_LOGS: string[] = [];
+const originalConsLog = console.log;
+console.log = (...args: any[]) => {
+   const ts = new Date().toISOString().substring(11, 23);
+   const line = `[${ts}] ` + args.map(a => typeof a === 'string' ? a : JSON.stringify(a)).join(" ");
+   STREAM_LOGS.push(line);
+   if (STREAM_LOGS.length > 50) STREAM_LOGS.shift();
+   originalConsLog(...args);
+};
+
+export function getStreamLogs() {
+  return STREAM_LOGS;
+}
+
 async function main() {
   const [cmd, ...args] = process.argv.slice(2);
   const axl = new AxlClient(AXL);
@@ -105,6 +119,7 @@ async function main() {
            res.writeHead(200, { "Content-Type": "application/json" });
            res.end(JSON.stringify({ 
              axl: AXL,
+             logs: getStreamLogs(),
              ...agent.getUIStatus()
            })); 
            return;
@@ -134,7 +149,7 @@ async function main() {
         res.setHeader("Access-Control-Allow-Origin", "*");
         if (req.method === "GET" && req.url === "/status") {
            res.writeHead(200, { "Content-Type": "application/json" });
-           res.end(JSON.stringify({ axl: AXL, peerId: "" })); 
+           res.end(JSON.stringify({ axl: AXL, peerId: "", logs: getStreamLogs() })); 
            return;
         }
         res.writeHead(404);
