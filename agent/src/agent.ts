@@ -102,6 +102,35 @@ export class HuddleAgent {
     }
   }
 
+  getUIStatus() {
+    const statuses: any[] = [];
+    for (const [c, commit] of this.myCommits.entries()) {
+      const cluster = this.clusters.get(c);
+      let statusString = "Broadcasting Intent";
+      if (cluster) {
+         if (cluster.formed) statusString = "Negotiating Tier Price";
+         if (cluster.offer) statusString = "Tier Offer Received";
+         if (cluster.coalitionAddress) statusString = "Deploying Coalition";
+         if (cluster.fundedByMe) statusString = "Settled (commit ready)";
+      }
+      statuses.push({
+         commitment: short(c),
+         sku: commit.intent.sku,
+         qty: commit.intent.qty,
+         max_unit_price: commit.intent.max_unit_price,
+         deadline_ms: commit.intent.deadline_ms,
+         statusStr: statusString,
+         clusterSize: cluster ? cluster.members.size : 1,
+         offer: cluster?.offer,
+         address: cluster?.coalitionAddress || null
+      });
+    }
+    return {
+      peerId: this.myPeerId,
+      myCommits: statuses,
+    };
+  }
+
   async submit(intent: Intent): Promise<string> {
     const c = commitment(intent);
     const nonce = newNonce();

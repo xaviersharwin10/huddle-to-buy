@@ -24,6 +24,16 @@ body {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  overflow: hidden; /* Hide root overflow if any */
+}
+
+/* Hide scrollbar universally for all elements */
+::-webkit-scrollbar {
+  display: none;
+}
+* {
+  -ms-overflow-style: none; /* IE and Edge */
+  scrollbar-width: none;    /* Firefox */
 }
 
 h1, h2, h3, h4, h5, h6 {

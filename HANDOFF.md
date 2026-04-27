@@ -31,7 +31,7 @@ Most digital products (AWS RIs, Twilio, Figma Enterprise, RunPod / CoreWeave / L
 | 4 | `Coalition.sol` + factory + tests; seller stub + negotiate flow | ✅ done locally; **Base Sepolia deploy pending private key** |
 | 5 | KeeperHub keeper wired up; atomic commit + refund both demonstrated | ✅ done (refundAll and commit() happy path scripted & verified) |
 | 6 | x402 payment leg + ERC-7857 Buyer Profile iNFT on 0G | ✅ done (wrapped fund() and added 0G Testnet deployment stub) |
-| 7 | Web UI polish; recording; rehearse 3-min pitch | ⬜ |
+| 7 | Web UI | ⬜ |
 | 8 | Buffer + final demo video | ⬜ |
 
 ---

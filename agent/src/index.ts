@@ -104,9 +104,9 @@ async function main() {
         if (req.method === "GET" && req.url === "/status") {
            res.writeHead(200, { "Content-Type": "application/json" });
            res.end(JSON.stringify({ 
-             peerId: agent.myPeerId,
-             axl: AXL
-           })); // Mock status
+             axl: AXL,
+             ...agent.getUIStatus()
+           })); 
            return;
         }
         res.writeHead(404);
@@ -128,6 +128,23 @@ async function main() {
       const seller = new SellerAgent(axl);
       await seller.init();
       console.log(`seller mode on AXL ${AXL}`);
+      
+      const http = await import("http");
+      const server = http.createServer((req, res) => {
+        res.setHeader("Access-Control-Allow-Origin", "*");
+        if (req.method === "GET" && req.url === "/status") {
+           res.writeHead(200, { "Content-Type": "application/json" });
+           res.end(JSON.stringify({ axl: AXL, peerId: "" })); 
+           return;
+        }
+        res.writeHead(404);
+        res.end();
+      });
+      const port = process.env.PORT || 3001;
+      server.listen(port, () => {
+        console.log(`Seller UI backend listening on http://localhost:${port}`);
+      });
+
       while (true) {
         const got = await seller.runOnce();
         if (!got) await sleep(300);
