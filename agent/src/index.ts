@@ -66,10 +66,56 @@ async function main() {
           qty: Number(args[3]),
         };
         await agent.submit(intent);
-      } else if (args.length > 0) {
+      } else if (args.length > 0 && args[0] !== "daemon") {
         process.stderr.write(help);
         process.exit(2);
       }
+
+      // Local API Daemon for UI integration
+      const http = await import("http");
+      const server = http.createServer((req, res) => {
+        res.setHeader("Access-Control-Allow-Origin", "*");
+        res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+        res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+        
+        if (req.method === "OPTIONS") {
+          res.writeHead(200);
+          res.end();
+          return;
+        }
+
+        if (req.method === "POST" && req.url === "/submit") {
+          let body = "";
+          req.on("data", chunk => body += chunk);
+          req.on("end", async () => {
+             try {
+                const intent = JSON.parse(body);
+                await agent.submit(intent);
+                res.writeHead(200, { "Content-Type": "application/json" });
+                res.end(JSON.stringify({ success: true }));
+             } catch (e) {
+                res.writeHead(400);
+                res.end(JSON.stringify({ error: (e as Error).toString() }));
+             }
+          });
+          return;
+        }
+
+        if (req.method === "GET" && req.url === "/status") {
+           res.writeHead(200, { "Content-Type": "application/json" });
+           res.end(JSON.stringify({ 
+             peerId: agent.myPeerId,
+             axl: AXL
+           })); // Mock status
+           return;
+        }
+        res.writeHead(404);
+        res.end();
+      });
+      const port = process.env.PORT || 3001;
+      server.listen(port, () => {
+        console.log(`Agent UI backend listening on http://localhost:${port}`);
+      });
 
       console.log(`watching AXL ${AXL} (k=${K})`);
       while (true) {
