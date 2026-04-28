@@ -1,8 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
 import confetti from "canvas-confetti";
 import { CheckCircle2, Play, Activity, Network, Zap, Bot, Cpu, Wifi, MessageSquare } from "lucide-react";
+import { Canvas, useFrame } from "@react-three/fiber";
+import { useGLTF, Environment, Clone } from "@react-three/drei";
 import "./globals.css";
 
 const AGENTS = [
@@ -11,6 +13,24 @@ const AGENTS = [
   { id: "buyer3", name: "Buyer 3", port: 3003, type: "buyer" },
   { id: "seller", name: "Seller Agent", port: 3004, type: "seller" }
 ];
+
+useGLTF.preload("/Hitem3d.glb");
+
+function Model3D({ flip }: { flip: boolean }) {
+  const { scene } = useGLTF("/Hitem3d.glb");
+  const ref = useRef<any>(null);
+  
+  useFrame((state) => {
+    if (ref.current) {
+      ref.current.rotation.y = (flip ? Math.PI : 0) + Math.sin(state.clock.elapsedTime) * 0.2;
+      ref.current.position.y = Math.sin(state.clock.elapsedTime * 2) * 0.1;
+    }
+  });
+
+  return (
+    <Clone ref={ref} object={scene} scale={1.2} position={[0, -1, 0]} />
+  );
+}
 
 function Agent3DScene({ gState }: any) {
   const [rotate, setRotate] = useState({ x: 10, y: -10 });
@@ -38,19 +58,19 @@ function Agent3DScene({ gState }: any) {
     }
     if (isNegotiating) {
       if (botId === 'b1') return "Pending tx...";
-      if (botId === 'b2') return "[P2P] Join my guild? We use 0G.";
+      if (botId === 'b2') return "[P2P] Form a Huddle? We use 0G.";
       if (botId === 'b3') return "[P2P] Agreed. Sending 0.5 ETH.";
       if (botId === 'seller') return "Verifying Keeper SLA...";
     }
     if (isDeploying) {
       if (botId === 'b1') return "Failed: Gas Spike!";
       if (botId === 'b2') return "[ONCHAIN_ACTION] Bidding 2.1 ETH via KeeperHub";
-      if (botId === 'b3') return "Liquidity pooled via AXL.";
+      if (botId === 'b3') return "Liquidity Huddled via AXL.";
       if (botId === 'seller') return "B2's bid verified by KeeperHub.";
     }
     if (isDone) {
       if (botId === 'b1') return "Out of Gas.";
-      if (botId === 'b2') return "Asset Won via Guild!";
+      if (botId === 'b2') return "Discount Won via Huddle!";
       if (botId === 'b3') return "Share secured.";
       if (botId === 'seller') return "Sale Complete. Saving to 0G.";
     }
@@ -82,13 +102,19 @@ function Agent3DScene({ gState }: any) {
            <div style={{ position: 'absolute', bottom: '-5px', left: '50%', transform: 'translateX(-50%)', borderTop: `5px solid ${isFailed ? '#ff0000' : 'rgba(5,5,15,0.85)'}`, borderLeft: '5px solid transparent', borderRight: '5px solid transparent' }}></div>
         </div>
         
-        <img src="https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Robot/3D/robot_3d.png" 
-             alt={label} 
-             style={{ 
-               width: '100px', height: '100px', objectFit: 'contain', 
-               transform: flip ? 'scaleX(-1)' : 'none', 
-               filter: `brightness(${isFailed ? 0.1 : 0.4}) contrast(1.5) drop-shadow(0 15px 15px rgba(0,0,0,0.8)) ${!isFailed ? `drop-shadow(0 0 25px ${highlight})` : ''} hue-rotate(${hue}deg)` 
-             }} />
+        <div style={{ 
+          width: '120px', height: '120px',
+          filter: `brightness(${isFailed ? 0.3 : 0.9}) contrast(1.1) drop-shadow(0 15px 15px rgba(0,0,0,0.8)) ${!isFailed ? `drop-shadow(0 0 25px ${highlight})` : ''} hue-rotate(${hue}deg)` 
+        }}>
+          <Canvas camera={{ position: [0, 0, 4.5], fov: 50 }} style={{ pointerEvents: 'none' }}>
+            <ambientLight intensity={0.5} />
+            <directionalLight position={[10, 10, 5]} intensity={1.5} />
+            <Suspense fallback={null}>
+              <Model3D flip={flip} />
+              <Environment preset="city" />
+            </Suspense>
+          </Canvas>
+        </div>
         <div style={{ marginTop: '8px', background: 'rgba(0,0,0,0.6)', padding: '4px 8px', borderRadius: '4px', fontSize: '0.65rem', fontWeight: 'bold', color: '#fff', border: `1px solid ${highlight}` }}>{label}</div>
       </div>
     );
@@ -165,11 +191,11 @@ function Agent3DScene({ gState }: any) {
            boxShadow: 'inset 0 0 50px rgba(6,182,212,0.2), 0 0 50px rgba(6,182,212,0.4)', pointerEvents: 'none'
         }} />
 
-        <RobotNode id="b1" label="B1 (Red)" x="5%" y="15%" scale={0.8} highlight="rgba(239,68,68,0.8)" hue={150} thought={getThought('b1')} isFailed={isDeploying || isDone} />
-        <RobotNode id="b2" label="B2 (Cyan) - Guild Hero" x="20%" y="35%" scale={1.4} highlight="rgba(6,182,212,1)" hue={0} thought={getThought('b2')} />
-        <RobotNode id="b3" label="B3 (Yellow)" x="35%" y="25%" scale={0.9} highlight="rgba(234,179,8,0.8)" hue={-150} thought={getThought('b3')} />
+        <RobotNode id="b1" label="B1 (Loner)" x="5%" y="15%" scale={0.8} highlight="rgba(239,68,68,0.8)" hue={150} thought={getThought('b1')} isFailed={isDeploying || isDone} />
+        <RobotNode id="b2" label="B2 (Huddle Initiator)" x="20%" y="35%" scale={1.4} highlight="rgba(6,182,212,1)" hue={0} thought={getThought('b2')} />
+        <RobotNode id="b3" label="B3 (Huddle Peer)" x="35%" y="25%" scale={0.9} highlight="rgba(234,179,8,0.8)" hue={-150} thought={getThought('b3')} />
 
-        <RobotNode id="seller" label="Seller (Purple)" x="70%" y="30%" scale={1.4} flip hue={100} highlight="rgba(168,85,247,1)" thought={getThought('seller')} />
+        <RobotNode id="seller" label="Seller (Huddle Node)" x="70%" y="30%" scale={1.4} flip hue={100} highlight="rgba(168,85,247,1)" thought={getThought('seller')} />
 
       </div>
       <style dangerouslySetInnerHTML={{__html: `
@@ -365,7 +391,7 @@ export default function Dashboard() {
               <Connector done={stageIndex > 2} active={stageIndex === 2} />
               <WorkflowNode title="3. Seller Algorithm" icon={CheckCircle2} sub="Daemon dynamically evaluates demand & sets tier." done={stageIndex > 2} active={stageIndex === 3} delay="0.2s" />
               <Connector done={stageIndex > 3} active={stageIndex === 3} />
-              <WorkflowNode title="4. Base Sepolia" icon={Network} sub="Agent deploys Smart Contract & funds escrow." done={stageIndex > 3} active={stageIndex === 4} delay="0.3s" />
+              <WorkflowNode title="4. Gensyn L2" icon={Network} sub="Agent deploys Smart Contract & funds escrow." done={stageIndex > 3} active={stageIndex === 4} delay="0.3s" />
               <Connector done={stageIndex > 4} active={stageIndex === 4} />
               <WorkflowNode title="5. KeeperHub" icon={Zap} sub="Node triggers payload sweeping funds to Seller." done={stageIndex >= 5} active={stageIndex === 5 && keeperRunning} delay="0.4s" />
            </div>
@@ -422,7 +448,7 @@ export default function Dashboard() {
                         <div style={{ color: '#fff', fontSize: '1.1rem' }}>
                           <p>The Keeper successfully committed the Coalition Smart Contract logic.</p>
                           <p style={{ marginTop: '0.5rem', fontWeight: 'bold', fontSize: '1.5rem' }}>Funds Swept: <span style={{color: '#10b981'}}>+(30 units * $1.50) = $45.00 USDC</span></p>
-                          <p style={{ fontSize: '0.8rem', color: '#cbd5e1', marginTop: '0.5rem' }}>View transaction output on Base Sepolia: {b1Commit.address}</p>
+                          <p style={{ fontSize: '0.8rem', color: '#cbd5e1', marginTop: '0.5rem' }}>View transaction output on Gensyn L2: {b1Commit.address}</p>
                         </div>
                      </div>
                    )}
@@ -497,8 +523,8 @@ export default function Dashboard() {
                  </div>
 
                  <div style={{ marginTop: '2rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    <a href={`https://sepolia.basescan.org/address/${commit.address}`} target="_blank" rel="noreferrer" style={{ display: 'block', padding: '1rem', background: 'rgba(99,102,241,0.1)', border: '1px solid #6366f1', borderRadius: '8px', color: '#818cf8', textDecoration: 'none', textAlign: 'center', fontWeight: 'bold' }}>
-                       View Coalition on Base Sepolia Explorer →
+                    <a href={`https://explorer.gensyn.ai/address/${commit.address}`} target="_blank" rel="noreferrer" style={{ display: 'block', padding: '1rem', background: 'rgba(99,102,241,0.1)', border: '1px solid #6366f1', borderRadius: '8px', color: '#818cf8', textDecoration: 'none', textAlign: 'center', fontWeight: 'bold' }}>
+                       View Coalition on Gensyn L2 Explorer →
                     </a>
                     <a href="#" style={{ display: 'block', padding: '1rem', background: 'rgba(56,189,248,0.1)', border: '1px solid #38bdf8', borderRadius: '8px', color: '#7dd3fc', textDecoration: 'none', textAlign: 'center', fontWeight: 'bold' }}>
                        Verify Buyer Preferences zeroG Storage iNFT →
