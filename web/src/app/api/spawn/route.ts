@@ -1,15 +1,21 @@
-import { spawn, exec } from "child_process";
+import { exec } from "child_process";
 import { NextResponse } from "next/server";
 import path from "path";
+import fs from "fs";
 
-// Track running processes by port
-const runningAgents: Map<number, any> = new Map();
+// Track PIDs by port so we can kill them
+const pidByPort: Map<number, number> = new Map();
 
 const ENV_MAP: Record<string, string> = {
   buyer1: ".env.buyer1",
   buyer2: ".env.buyer2",
   buyer3: ".env.buyer3",
-  seller: ".env.seller",
+};
+
+const SELLER_ENV: Record<string, string> = {
+  AXL_API: "http://127.0.0.1:9032",
+  PRIVATE_KEY: "0xf01962b99237d8525781736ca31397756cd1345e01e09ba529a86a8353275f0c",
+  SELLER_PEER_ID: "0d6836e00c80d151a9a6b3157e9d30131bf6611c49e560ee0fdba264679d8238",
 };
 
 export async function POST(req: Request) {
@@ -17,46 +23,55 @@ export async function POST(req: Request) {
     const { agentId, port, type } = await req.json();
     const agentDir = path.resolve(process.cwd(), "../agent");
 
-    // Kill old process on this port if exists
-    const old = runningAgents.get(port);
-    if (old) { try { old.kill("SIGTERM"); } catch {} runningAgents.delete(port); }
+    // Kill existing process on that port first
+    const oldPid = pidByPort.get(port);
+    if (oldPid) {
+      try { process.kill(oldPid, "SIGTERM"); } catch {}
+      pidByPort.delete(port);
+    }
+    // Also taskkill by port as fallback
+    await new Promise<void>(r => exec(`for /f "tokens=5" %a in ('netstat -aon ^| findstr :${port}') do taskkill /PID %a /F 2>nul`, () => r()));
 
-    // Build env
-    const env: Record<string, string> = { ...process.env as any, PORT: String(port) };
+    // Build env vars string for the PowerShell command
+    let envChunk = `$env:PORT='${port}'; `;
 
-    // Build command args
-    const tsArgs = type === "seller"
-      ? ["exec", "tsx", "src/index.ts", "seller"]
-      : ["exec", "tsx", "src/index.ts", "run", "daemon"];
-
-    // Load env file vars
-    if (ENV_MAP[agentId]) {
-      const fs = await import("fs");
+    if (type === "seller") {
+      for (const [k, v] of Object.entries(SELLER_ENV)) {
+        envChunk += `$env:${k}='${v}'; `;
+      }
+    } else if (ENV_MAP[agentId]) {
       const envPath = path.join(agentDir, ENV_MAP[agentId]);
       if (fs.existsSync(envPath)) {
         fs.readFileSync(envPath, "utf8")
-          .split("\n")
-          .filter(l => /^[^#].+=/.test(l))
+          .split(/\r?\n/)
+          .filter(l => /^[^#\s].+=/.test(l))
           .forEach(l => {
             const idx = l.indexOf("=");
-            if (idx > -1) env[l.slice(0, idx).trim()] = l.slice(idx + 1).trim();
+            if (idx > -1) {
+              const k = l.slice(0, idx).trim();
+              const v = l.slice(idx + 1).trim();
+              envChunk += `$env:${k}='${v}'; `;
+            }
           });
       }
     }
 
-    const proc = spawn("pnpm", tsArgs, {
-      cwd: agentDir,
-      env,
-      detached: false,
-      stdio: "pipe",
-    });
+    const tsCmd = type === "seller"
+      ? "pnpm exec tsx src/index.ts seller"
+      : "pnpm exec tsx src/index.ts run daemon";
 
-    runningAgents.set(port, proc);
-    const pid = proc.pid;
+    // Full PowerShell one-liner  
+    const psCmd = `Set-Location '${agentDir}'; ${envChunk}${tsCmd}`;
 
-    proc.on("exit", () => runningAgents.delete(port));
+    // Spawn a detached powershell window
+    const child = exec(
+      `powershell.exe -NoExit -Command "${psCmd.replace(/"/g, '\\"')}"`,
+      { cwd: agentDir }
+    );
 
-    return NextResponse.json({ success: true, pid });
+    if (child.pid) pidByPort.set(port, child.pid);
+
+    return NextResponse.json({ success: true, pid: child.pid ?? null });
   } catch (e) {
     return NextResponse.json({ success: false, error: (e as Error).toString() }, { status: 500 });
   }
@@ -65,15 +80,14 @@ export async function POST(req: Request) {
 export async function DELETE(req: Request) {
   try {
     const { port } = await req.json();
-    const proc = runningAgents.get(port);
-    if (proc) {
-      proc.kill("SIGTERM");
-      runningAgents.delete(port);
-      return NextResponse.json({ success: true });
+    const pid = pidByPort.get(port);
+    if (pid) {
+      try { process.kill(pid, "SIGTERM"); } catch {}
+      pidByPort.delete(port);
     }
-    // Also try killing by port via fuser/taskkill as fallback
-    exec(`npx kill-port ${port} 2>nul`, () => {});
-    return NextResponse.json({ success: true, note: "No tracked process; sent kill-port." });
+    // Kill by port via netstat + taskkill as reliable fallback on Windows
+    exec(`for /f "tokens=5" %a in ('netstat -aon ^| findstr :${port}') do taskkill /PID %a /F 2>nul`);
+    return NextResponse.json({ success: true });
   } catch (e) {
     return NextResponse.json({ success: false, error: (e as Error).toString() }, { status: 500 });
   }

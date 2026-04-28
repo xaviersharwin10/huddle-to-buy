@@ -31,8 +31,17 @@ export default function Dashboard() {
       const states: any = {};
       for (const ag of AGENTS) {
         try {
-          const res = await fetch(`http://localhost:${ag.port}/status`);
-          states[ag.id] = await res.json();
+          const data = await new Promise((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            xhr.open("GET", `http://localhost:${ag.port}/status`);
+            xhr.onload = () => {
+              try { resolve(JSON.parse(xhr.responseText)); } 
+              catch(e) { reject(e); }
+            };
+            xhr.onerror = () => reject(new Error("Network Error"));
+            xhr.send();
+          });
+          states[ag.id] = data;
         } catch {
           states[ag.id] = null;
         }
@@ -50,9 +59,41 @@ export default function Dashboard() {
     }
   }, [paymentComplete]);
 
+  // ⚡ INDEPENDENT KEEPER WATCHER — fires whenever ANY path (manual or auto) hits "Settled"
+  useEffect(() => {
+    const b1 = agentsState.buyer1?.myCommits?.[0];
+    const isSettled = b1?.statusStr?.includes("Settled");
+    const hasAddress = !!b1?.address;
+    const alreadyDone = paymentComplete || keeperRunning || window.sessionStorage.getItem("keeperFired");
+
+    if (isSettled && hasAddress && !alreadyDone) {
+      window.sessionStorage.setItem("keeperFired", "true");
+      setKeeperRunning(true);
+      console.log("[Keeper Watcher] Detected settled coalition. Auto-firing keeper for:", b1.address);
+
+      fetch("/api/keeper", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ address: b1.address }),
+      })
+        .then(r => r.json())
+        .then(data => {
+          console.log("[Keeper] Result:", data);
+          setKeeperRunning(false);
+          setPaymentComplete(true);
+        })
+        .catch(err => {
+          console.error("[Keeper] Error:", err);
+          setKeeperRunning(false);
+        });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [agentsState]);
+
   // Unified auto-simulate function
   const startSimulation = async () => {
     window.sessionStorage.removeItem("confettiDone");
+    window.sessionStorage.removeItem("keeperFired");
     setSimulating(true);
     setKeeperRunning(false);
     setPaymentComplete(false);
@@ -457,6 +498,8 @@ function TerminalPanel({ activeTab, agentState, paymentComplete, onReset }: any)
 
   const handleReset = () => {
     addLog("$ Clearing session state. Ready for new round.");
+    window.sessionStorage.removeItem("confettiDone");
+    window.sessionStorage.removeItem("keeperFired");
     onReset();
   };
 
