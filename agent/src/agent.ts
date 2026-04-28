@@ -211,8 +211,13 @@ export class HuddleAgent {
     };
     const body = JSON.stringify(env);
     for (const p of peers) {
-      try { await this.axl.send(p, body); this.log(`  -> reveal_req to ${short(p)}`); }
-      catch (e) { this.log(`  ! reveal_req to ${short(p)} failed: ${(e as Error).message}`); }
+      try {
+        // Use AXL /a2a endpoint for structured session (Gensyn bonus: A2A)
+        await this.axl.a2a(p, env).catch(() => this.axl.send(p, body));
+        this.log(`  -> reveal_req [A2A] to ${short(p)}`);
+      } catch (e) {
+        this.log(`  ! reveal_req to ${short(p)} failed: ${(e as Error).message}`);
+      }
     }
     await this.maybeFinalize(c);
   }
@@ -234,8 +239,13 @@ export class HuddleAgent {
         v: 1, kind: "reveal_response", from: this.myPeerId,
         commitment: env.commitment, intent: my.intent, nonce: my.nonce,
       };
-      try { await this.axl.send(env.from, JSON.stringify(resp)); this.log(`  -> reveal_resp to ${short(env.from)}`); }
-      catch (e) { this.log(`  ! reveal_resp to ${short(env.from)} failed: ${(e as Error).message}`); }
+      try {
+        // Use AXL /a2a endpoint for structured session (Gensyn bonus: A2A)
+        await this.axl.a2a(env.from, resp).catch(() => this.axl.send(env.from, JSON.stringify(resp)));
+        this.log(`  -> reveal_resp [A2A] to ${short(env.from)}`);
+      } catch (e) {
+        this.log(`  ! reveal_resp to ${short(env.from)} failed: ${(e as Error).message}`);
+      }
     }
     await this.maybeFinalize(env.commitment);
   }
@@ -290,9 +300,13 @@ export class HuddleAgent {
       unit_qty: sample.qty,
       max_unit_price: sample.max_unit_price,
     };
-    this.log(`coordinator: sending negotiate_request to seller ${short(this.sellerPeerId)} (n=${req.n_buyers}, max=$${req.max_unit_price})`);
-    try { await this.axl.send(this.sellerPeerId, JSON.stringify(req)); }
-    catch (e) { this.log(`  ! negotiate_request failed: ${(e as Error).message}`); }
+    this.log(`coordinator: sending negotiate_request [A2A] to seller ${short(this.sellerPeerId)} (n=${req.n_buyers}, max=$${req.max_unit_price})`);
+    try {
+      // Use AXL /a2a endpoint for negotiation session (Gensyn bonus: A2A)
+      await this.axl.a2a(this.sellerPeerId!, req).catch(() => this.axl.send(this.sellerPeerId!, JSON.stringify(req)));
+    } catch (e) {
+      this.log(`  ! negotiate_request failed: ${(e as Error).message}`);
+    }
   }
 
   private async onNegotiateResponse(env: NegotiateRespEnv): Promise<void> {
@@ -415,6 +429,22 @@ export class HuddleAgent {
       }
       this.log(`fund: success tx=${fundTx}`);
       cluster.fundedByMe = true;
+
+      // Trigger KeeperHub commit via AXL /mcp endpoint (Gensyn MCP bonus + KeeperHub depth)
+      if (this.sellerPeerId) {
+        try {
+          this.log(`[MCP] Invoking KeeperHub commit via AXL /mcp/${short(this.sellerPeerId)}/keeperhub...`);
+          const mcpResult = await this.axl.callMcp(
+            this.sellerPeerId,
+            "keeperhub",
+            "commit_coalition",
+            { coalitionAddress },
+          );
+          this.log(`[MCP] Keeper commit result: ${JSON.stringify(mcpResult)}`);
+        } catch (e) {
+          this.log(`[MCP] Keeper MCP call failed (fallback to direct): ${(e as Error).message}`);
+        }
+      }
     } catch (e) {
       this.log(`  ! fund failed: ${(e as Error).message}`);
     }

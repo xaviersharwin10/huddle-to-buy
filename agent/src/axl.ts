@@ -53,4 +53,42 @@ export class AxlClient {
       .map((n) => n.public_key)
       .filter((k) => k !== t.our_public_key);
   }
+
+  /**
+   * Agent-to-Agent structured session endpoint.
+   * Used for reveal handshake + coordinator election (session layer).
+   * Gensyn AXL bonus: "novel use of A2A endpoints".
+   */
+  async a2a(destPeerId: string, payload: object): Promise<any> {
+    const res = await fetch(`${this.base}/a2a/${destPeerId}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error(`AXL /a2a ${res.status}: ${await res.text()}`);
+    return res.json();
+  }
+
+  /**
+   * MCP tool invocation via AXL's /mcp/{peer}/{service} endpoint.
+   * Used to trigger KeeperHub commit via the MCP server hosted on the seller node.
+   * Gensyn AXL bonus: "novel use of MCP endpoints".
+   */
+  async callMcp(
+    peerKey: string,
+    service: string,
+    toolName: string,
+    args: object,
+  ): Promise<any> {
+    const res = await fetch(`${this.base}/mcp/${peerKey}/${service}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        method: "tools/call",
+        params: { name: toolName, arguments: args },
+      }),
+    });
+    if (!res.ok) throw new Error(`AXL /mcp ${res.status}: ${await res.text()}`);
+    return res.json();
+  }
 }

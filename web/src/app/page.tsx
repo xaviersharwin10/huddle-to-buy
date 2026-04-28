@@ -1,10 +1,8 @@
 "use client";
 
-import { useState, useEffect, useRef, Suspense } from "react";
+import { useState, useEffect, useRef } from "react";
 import confetti from "canvas-confetti";
-import { CheckCircle2, Play, Activity, Network, Zap, Bot, Cpu, Wifi, MessageSquare } from "lucide-react";
-import { Canvas, useFrame } from "@react-three/fiber";
-import { useGLTF, Environment, Clone } from "@react-three/drei";
+import { CheckCircle2, Play, Activity, Network, Zap } from "lucide-react";
 import "./globals.css";
 
 const AGENTS = [
@@ -14,200 +12,162 @@ const AGENTS = [
   { id: "seller", name: "Seller Agent", port: 3004, type: "seller" }
 ];
 
-useGLTF.preload("/Hitem3d.glb");
 
-function Model3D({ flip }: { flip: boolean }) {
-  const { scene } = useGLTF("/Hitem3d.glb");
-  const ref = useRef<any>(null);
-  
-  useFrame((state) => {
-    if (ref.current) {
-      ref.current.rotation.y = (flip ? Math.PI : 0) + Math.sin(state.clock.elapsedTime) * 0.2;
-      ref.current.position.y = Math.sin(state.clock.elapsedTime * 2) * 0.1;
-    }
-  });
+function LiveTopologyGraph({ gState, agentsState }: { gState: string; agentsState: any }) {
+  const [topology, setTopology] = useState<any>(null);
 
-  return (
-    <Clone ref={ref} object={scene} scale={1.2} position={[0, -1, 0]} />
-  );
-}
-
-function Agent3DScene({ gState }: any) {
-  const [rotate, setRotate] = useState({ x: 10, y: -10 });
-
-  const handleMouseMove = (e: any) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = (e.clientX - rect.left) / rect.width - 0.5;
-    const y = (e.clientY - rect.top) / rect.height - 0.5;
-    setRotate({ x: y * -20, y: x * 20 });
-  };
+  useEffect(() => {
+    const poll = setInterval(async () => {
+      try {
+        const r = await fetch("http://localhost:9002/topology");
+        if (r.ok) setTopology(await r.json());
+      } catch {}
+    }, 2000);
+    return () => clearInterval(poll);
+  }, []);
 
   const isIdle = gState === "idle";
-  const isTransmitting = gState === "broadcasting" || gState === "revealing";
-  const isNegotiating = gState === "negotiated";
-  const isDeploying = gState === "deploying" || gState === "settled";
-  const isDone = gState === "paid";
+  const isActive = gState !== "idle";
+  const isSettled = gState === "settled" || gState === "paid";
 
-  const getThought = (botId: string) => {
-    if (isIdle) return null;
-    if (isTransmitting) {
-      if (botId === 'b1') return "I bid 2.0 ETH!";
-      if (botId === 'b2') return "[THOUGHT] 0G logs show B1 bids high.";
-      if (botId === 'b3') return "Evaluating Execution Risk...";
-      if (botId === 'seller') return "Awaiting valid KeeperHub proof...";
-    }
-    if (isNegotiating) {
-      if (botId === 'b1') return "Pending tx...";
-      if (botId === 'b2') return "[P2P] Form a Huddle? We use 0G.";
-      if (botId === 'b3') return "[P2P] Agreed. Sending 0.5 ETH.";
-      if (botId === 'seller') return "Verifying Keeper SLA...";
-    }
-    if (isDeploying) {
-      if (botId === 'b1') return "Failed: Gas Spike!";
-      if (botId === 'b2') return "[ONCHAIN_ACTION] Bidding 2.1 ETH via KeeperHub";
-      if (botId === 'b3') return "Liquidity Huddled via AXL.";
-      if (botId === 'seller') return "B2's bid verified by KeeperHub.";
-    }
-    if (isDone) {
-      if (botId === 'b1') return "Out of Gas.";
-      if (botId === 'b2') return "Discount Won via Huddle!";
-      if (botId === 'b3') return "Share secured.";
-      if (botId === 'seller') return "Sale Complete. Saving to 0G.";
-    }
-    return null;
-  };
+  const ourKey = topology?.our_public_key ?? "";
+  const peers = topology?.peers ?? [];
+  const allNodes = [
+    { key: ourKey, label: "You (B1)", x: 200, y: 200, color: "#6366f1", isSelf: true, up: true },
+    ...peers.map((p: any, i: number) => {
+      const angle = (i / Math.max(peers.length, 1)) * Math.PI * 2 - Math.PI / 2;
+      const r = 140;
+      return {
+        key: p.public_key,
+        label: p.public_key?.startsWith("0d68") ? "Seller" : `Peer ${i + 1}`,
+        x: 200 + Math.cos(angle) * r,
+        y: 200 + Math.sin(angle) * r,
+        color: p.up ? (p.public_key?.startsWith("0d68") ? "#a855f7" : "#06b6d4") : "#555",
+        up: p.up,
+        isSelf: false,
+      };
+    }),
+  ];
 
-  const RobotNode = ({ id, label, x, y, scale = 1, flip = false, hue = 0, thought, highlight, isFailed = false }: any) => {
-    const isLoner = id === 'b1';
-    const hasThought = !!thought;
-    return (
-      <div style={{
-        position: 'absolute', left: x, top: y,
-        transform: `scale(${scale}) translateZ(${40 * scale}px)`,
-        display: 'flex', flexDirection: 'column', alignItems: 'center',
-        transition: 'all 0.8s ease-out', pointerEvents: 'none', zIndex: id==='b2' ? 5 : 2,
-        opacity: isFailed ? 0.3 : 1
-      }}>
-        <div style={{
-           opacity: hasThought ? 1 : 0, transform: hasThought ? 'translateY(0)' : 'translateY(10px)',
-           transition: 'all 0.3s', background: isFailed ? 'rgba(50,0,0,0.9)' : 'rgba(5,5,15,0.85)', 
-           color: isFailed ? '#ff4444' : '#06b6d4',
-           padding: '8px 12px', borderRadius: isFailed ? '2px' : '12px', fontSize: '0.75rem', fontWeight: 'bold',
-           marginBottom: '10px', position: 'relative', whiteSpace: 'nowrap',
-           boxShadow: `0 4px 15px ${isFailed ? 'rgba(255,0,0,0.5)' : highlight}`, zIndex: 10,
-           border: `1px solid ${isFailed ? '#ff0000' : highlight}`,
-           backdropFilter: 'blur(5px)'
-        }}>
-           {thought}
-           <div style={{ position: 'absolute', bottom: '-5px', left: '50%', transform: 'translateX(-50%)', borderTop: `5px solid ${isFailed ? '#ff0000' : 'rgba(5,5,15,0.85)'}`, borderLeft: '5px solid transparent', borderRight: '5px solid transparent' }}></div>
-        </div>
-        
-        <div style={{ 
-          width: '120px', height: '120px',
-          filter: `brightness(${isFailed ? 0.3 : 0.9}) contrast(1.1) drop-shadow(0 15px 15px rgba(0,0,0,0.8)) ${!isFailed ? `drop-shadow(0 0 25px ${highlight})` : ''} hue-rotate(${hue}deg)` 
-        }}>
-          <Canvas camera={{ position: [0, 0, 4.5], fov: 50 }} style={{ pointerEvents: 'none' }}>
-            <ambientLight intensity={0.5} />
-            <directionalLight position={[10, 10, 5]} intensity={1.5} />
-            <Suspense fallback={null}>
-              <Model3D flip={flip} />
-              <Environment preset="city" />
-            </Suspense>
-          </Canvas>
-        </div>
-        <div style={{ marginTop: '8px', background: 'rgba(0,0,0,0.6)', padding: '4px 8px', borderRadius: '4px', fontSize: '0.65rem', fontWeight: 'bold', color: '#fff', border: `1px solid ${highlight}` }}>{label}</div>
-      </div>
-    );
-  };
+  const b1Commit = agentsState?.buyer1?.myCommits?.[0];
+  const originalPrice = b1Commit?.max_unit_price ?? 2.0;
+  const negotiatedPrice = b1Commit?.offer?.tierUnitPrice ?? originalPrice;
+  const qty = b1Commit?.qty ?? 10;
+  const clusterSize = b1Commit?.clusterSize ?? 1;
+  const savedPerUnit = originalPrice - negotiatedPrice;
+  const savedTotal = savedPerUnit * qty * clusterSize;
+  const discountPct = originalPrice > 0 ? ((savedPerUnit / originalPrice) * 100).toFixed(0) : "0";
 
   return (
-    <div className="glass-panel" 
-         onMouseMove={handleMouseMove}
-         onMouseLeave={() => setRotate({x: 10, y: -10})}
-         style={{ 
-           position: 'relative', height: '420px', display: 'flex', alignItems: 'center', justifyContent: 'center', 
-           overflow: 'hidden', marginBottom: '2rem', background: '#020205',
-           perspective: '1200px', cursor: 'grab', border: '1px solid rgba(6,182,212,0.2)'
-         }}>
-         
-      <div style={{
-         position: 'absolute', width: '100%', height: '100%',
-         transform: `rotateX(${rotate.x + 10}deg) rotateY(${rotate.y}deg)`,
-         transformStyle: 'preserve-3d', transition: 'transform 0.1s linear'
-      }}>
-        {/* Floor grid */}
-        <div style={{
-          position: 'absolute', top: '70%', left: '-50%', width: '200%', height: '200%',
-          background: 'linear-gradient(transparent 49%, rgba(6, 182, 212, 0.15) 50%, transparent 51%), linear-gradient(90deg, transparent 49%, rgba(168, 85, 247, 0.1) 50%, transparent 51%)',
-          backgroundSize: '80px 80px', transform: 'rotateX(80deg)', transformOrigin: 'top center'
-        }}></div>
-
-        {/* Global HUD Scanner Bar */}
-        <div style={{ 
-          position: 'absolute', top: '5%', left: '50%', transform: 'translateX(-50%) translateZ(-50px)', 
-          textAlign: 'center', zIndex: 1, pointerEvents: 'none',
-          background: 'rgba(0,0,0,0.6)', border: '1px solid rgba(255,255,255,0.2)', padding: '0.5rem 2rem', 
-          width: '400px', borderRadius: '4px', overflow: 'hidden' 
-        }}>
-          <div style={{ position: 'relative', fontSize: '1rem', fontWeight: 800, color: '#fff', textTransform: 'uppercase', letterSpacing: '3px', textShadow: '0 0 10px rgba(255,255,255,0.8)' }}>
-            {isIdle ? "Agents on Standby" : 
-             isTransmitting ? "0G Storage Retrieval" :
-             isNegotiating ? "AXL P2P Mesh Forming" :
-             isDeploying ? "KEEPERHUB SETTLEMENT CHECK..." :
-             isDone ? "Settlement Guaranteed. Save to 0G." : "Processing..."}
+    <div className="glass-panel" style={{ position: 'relative', height: '420px', marginBottom: '2rem', background: '#020205', border: '1px solid rgba(6,182,212,0.2)', display: 'flex', overflow: 'hidden' }}>
+      <div style={{ flex: 1, position: 'relative' }}>
+        <div style={{ position: 'absolute', top: '12px', left: '16px', zIndex: 10 }}>
+          <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#06b6d4', textTransform: 'uppercase', letterSpacing: '2px' }}>
+            AXL P2P Mesh — Live Topology
           </div>
-          {(isTransmitting || isNegotiating || isDeploying) && (
-             <div style={{ position: 'absolute', left: 0, top: 0, width: '15px', height: '100%', background: '#06b6d4', opacity: 0.8, boxShadow: '0 0 20px #06b6d4', animation: 'scan 2s cubic-bezier(0.4, 0, 0.2, 1) infinite' }} />
-          )}
+          <div style={{ fontSize: '0.6rem', color: '#555', marginTop: '2px' }}>
+            {topology ? `Node: ${ourKey.slice(0, 12)}… | ${peers.length} peers connected` : "Connecting to AXL node..."}
+          </div>
         </div>
 
-        {/* AXL P2P Fiber Optic Mesh connecting B3 and B2 */}
-        {(isNegotiating || isDeploying || isDone) && (
-           <div style={{ position: 'absolute', left: '26%', top: '23%', width: '10%', height: '2px', background: '#06b6d4', transform: 'rotate(25deg)', animation: 'pulse-fiber 1s infinite alternate', boxShadow: '0 0 10px #06b6d4', zIndex: 1 }} />
-        )}
+        <svg viewBox="0 0 400 400" style={{ width: '100%', height: '100%' }}>
+          <defs>
+            <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+              <path d="M 40 0 L 0 0 0 40" fill="none" stroke="rgba(6,182,212,0.06)" strokeWidth="0.5"/>
+            </pattern>
+          </defs>
+          <rect width="400" height="400" fill="url(#grid)"/>
 
-        {/* Main transaction beam B2 -> Seller */}
-        {(isDeploying || isDone) && (
-           <div style={{ position: 'absolute', left: '32%', top: '40%', width: '38%', height: '3px', background: 'linear-gradient(90deg, #06b6d4, #a855f7)', transform: 'translateZ(30px) rotateY(-10deg)', animation: 'beam 1.5s infinite linear', boxShadow: '0 0 20px rgba(6,182,212,0.8)', zIndex: 1 }} />
-        )}
+          {allNodes.slice(1).map((peer, i) => (
+            <g key={`line-${i}`}>
+              <line x1={allNodes[0].x} y1={allNodes[0].y} x2={peer.x} y2={peer.y}
+                stroke={peer.up ? peer.color : "#333"} strokeWidth={isActive ? 2 : 1}
+                strokeDasharray={isActive ? "none" : "4 4"} opacity={peer.up ? (isActive ? 0.8 : 0.4) : 0.2}/>
+              {isActive && peer.up && (
+                <>
+                  <circle r="3" fill={peer.color} opacity="0.8">
+                    <animateMotion dur="2s" repeatCount="indefinite" path={`M${allNodes[0].x},${allNodes[0].y} L${peer.x},${peer.y}`}/>
+                  </circle>
+                </>
+              )}
+            </g>
+          ))}
 
-        {/* Guild iNFT Crystal */}
-        <div style={{
-           position: 'absolute', left: '46%', top: '45%',
-           width: '30px', height: '60px',
-           background: 'linear-gradient(135deg, rgba(6,182,212,0.8), rgba(168,85,247,1))',
-           clipPath: 'polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)',
-           boxShadow: '0 0 40px rgba(6,182,212,1)',
-           animation: 'float-crystal 3s ease-in-out infinite',
-           opacity: (isNegotiating || isDeploying || isDone) ? 1 : 0,
-           transition: 'opacity 1s', transformStyle: 'preserve-3d', zIndex: 3
-        }} />
+          {allNodes.slice(1).map((a, i) =>
+            allNodes.slice(i + 2).map((b, j) => (
+              <line key={`pp-${i}-${j}`} x1={a.x} y1={a.y} x2={b.x} y2={b.y}
+                stroke="rgba(168,85,247,0.15)" strokeWidth="1" strokeDasharray="2 6"/>
+            ))
+          )}
 
-        {/* KeeperHub Shield overhead */}
-        <div style={{
-           position: 'absolute', left: '50%', top: '20%', transform: 'translateX(-50%) translateZ(80px) rotateX(60deg)',
-           width: '150px', height: '150px', borderRadius: '50%', border: '4px dashed rgba(6,182,212,0.5)',
-           animation: 'spin-shield 10s linear infinite', opacity: (isDeploying || isDone) ? 1 : 0, transition: 'opacity 0.5s',
-           boxShadow: 'inset 0 0 50px rgba(6,182,212,0.2), 0 0 50px rgba(6,182,212,0.4)', pointerEvents: 'none'
-        }} />
+          {allNodes.map((node, i) => (
+            <g key={`node-${i}`}>
+              <circle cx={node.x} cy={node.y} r="30" fill="rgba(6,182,212,0.05)" opacity={isActive ? 1 : 0.3}/>
+              <circle cx={node.x} cy={node.y} r={node.isSelf ? 20 : 16}
+                fill="rgba(0,0,0,0.8)" stroke={node.color} strokeWidth="2"
+                style={{ filter: isActive ? `drop-shadow(0 0 8px ${node.color})` : 'none' }}/>
+              <text x={node.x} y={node.y + 1} textAnchor="middle" dominantBaseline="central"
+                fill="#fff" fontSize="7" fontWeight="bold" fontFamily="monospace">
+                {node.key?.slice(0, 6) ?? "..."}
+              </text>
+              <text x={node.x} y={node.y + 35} textAnchor="middle"
+                fill={node.color} fontSize="8" fontWeight="600" fontFamily="monospace">
+                {node.label}
+              </text>
+              {node.up && isActive && (
+                <circle cx={node.x + 18} cy={node.y - 14} r="4" fill="#10b981">
+                  <animate attributeName="opacity" values="1;0.3;1" dur="1.5s" repeatCount="indefinite"/>
+                </circle>
+              )}
+            </g>
+          ))}
 
-        <RobotNode id="b1" label="B1 (Loner)" x="5%" y="15%" scale={0.8} highlight="rgba(239,68,68,0.8)" hue={150} thought={getThought('b1')} isFailed={isDeploying || isDone} />
-        <RobotNode id="b2" label="B2 (Huddle Initiator)" x="20%" y="35%" scale={1.4} highlight="rgba(6,182,212,1)" hue={0} thought={getThought('b2')} />
-        <RobotNode id="b3" label="B3 (Huddle Peer)" x="35%" y="25%" scale={0.9} highlight="rgba(234,179,8,0.8)" hue={-150} thought={getThought('b3')} />
-
-        <RobotNode id="seller" label="Seller (Huddle Node)" x="70%" y="30%" scale={1.4} flip hue={100} highlight="rgba(168,85,247,1)" thought={getThought('seller')} />
-
+          <text x="200" y="385" textAnchor="middle" fill="#555" fontSize="8" fontFamily="monospace" fontWeight="700" letterSpacing="2">
+            {isIdle ? "STANDBY" : isSettled ? "SETTLEMENT COMPLETE" : "PROTOCOL ACTIVE"}
+          </text>
+        </svg>
       </div>
-      <style dangerouslySetInnerHTML={{__html: `
-        @keyframes beam { 0% { background-position: -200px; opacity: 0.5; } 50% { opacity: 1; } 100% { background-position: 400px; opacity: 0.5; } }
-        @keyframes float-crystal { 0%, 100% { transform: translateZ(50px) translateY(0) rotateY(0deg); } 50% { transform: translateZ(60px) translateY(-15px) rotateY(180deg); } }
-        @keyframes scan { 0% { left: 0%; opacity: 0; } 50% { opacity: 1; } 100% { left: 100%; opacity: 0; } }
-        @keyframes pulse-fiber { 0% { opacity: 0.3; } 100% { opacity: 1; } }
-        @keyframes spin-shield { 0% { transform: translateX(-50%) translateZ(80px) rotateX(70deg) rotateZ(0deg); } 100% { transform: translateX(-50%) translateZ(80px) rotateX(70deg) rotateZ(360deg); } }
-      `}} />
+
+      <div style={{ width: '220px', borderLeft: '1px solid rgba(6,182,212,0.15)', padding: '1rem', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '1rem' }}>
+        <div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#a855f7', textTransform: 'uppercase', letterSpacing: '2px', marginBottom: '0.5rem' }}>
+          Coalition Savings
+        </div>
+
+        <div style={{ background: 'rgba(16,185,129,0.05)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: '8px', padding: '0.75rem', textAlign: 'center' }}>
+          <div style={{ fontSize: '2rem', fontWeight: 900, color: '#10b981', lineHeight: 1 }}>
+            {savedTotal > 0 ? `$${savedTotal.toFixed(2)}` : "—"}
+          </div>
+          <div style={{ fontSize: '0.65rem', color: '#71717a', marginTop: '4px' }}>Total Savings</div>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+          <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: '6px', padding: '0.5rem', textAlign: 'center' }}>
+            <div style={{ fontSize: '1.1rem', fontWeight: 700, color: '#06b6d4' }}>{discountPct}%</div>
+            <div style={{ fontSize: '0.55rem', color: '#666' }}>Discount</div>
+          </div>
+          <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: '6px', padding: '0.5rem', textAlign: 'center' }}>
+            <div style={{ fontSize: '1.1rem', fontWeight: 700, color: '#eab308' }}>{clusterSize}</div>
+            <div style={{ fontSize: '0.55rem', color: '#666' }}>Buyers</div>
+          </div>
+          <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: '6px', padding: '0.5rem', textAlign: 'center' }}>
+            <div style={{ fontSize: '1.1rem', fontWeight: 700, color: '#f43f5e', textDecoration: savedPerUnit > 0 ? 'line-through' : 'none' }}>${originalPrice.toFixed(2)}</div>
+            <div style={{ fontSize: '0.55rem', color: '#666' }}>Retail</div>
+          </div>
+          <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: '6px', padding: '0.5rem', textAlign: 'center' }}>
+            <div style={{ fontSize: '1.1rem', fontWeight: 700, color: '#10b981' }}>${negotiatedPrice.toFixed(2)}</div>
+            <div style={{ fontSize: '0.55rem', color: '#666' }}>Huddle</div>
+          </div>
+        </div>
+
+        <div style={{ fontSize: '0.6rem', color: '#444', lineHeight: 1.5, marginTop: '0.5rem' }}>
+          {b1Commit?.statusStr ?? "Waiting for intent submission..."}
+        </div>
+      </div>
     </div>
   );
 }
+
+
 
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState(AGENTS[0]);
@@ -614,7 +574,7 @@ export default function Dashboard() {
           </header>
 
           {renderAgentWorkflow()}
-          <Agent3DScene gState={gState} />
+          <LiveTopologyGraph gState={gState} agentsState={agentsState} />
           {renderActiveTabContent()}
 
         </main>
