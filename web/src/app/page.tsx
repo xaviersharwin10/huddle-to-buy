@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import confetti from "canvas-confetti";
-import { CheckCircle2, Play, Activity, Network, Zap } from "lucide-react";
+import { CheckCircle2, Play, Activity, Network, Zap, Bot, Cpu, Wifi, MessageSquare } from "lucide-react";
 import "./globals.css";
 
 const AGENTS = [
@@ -11,6 +11,177 @@ const AGENTS = [
   { id: "buyer3", name: "Buyer 3", port: 3003, type: "buyer" },
   { id: "seller", name: "Seller Agent", port: 3004, type: "seller" }
 ];
+
+function Agent3DScene({ gState }: any) {
+  const [rotate, setRotate] = useState({ x: 10, y: -10 });
+
+  const handleMouseMove = (e: any) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = (e.clientX - rect.left) / rect.width - 0.5;
+    const y = (e.clientY - rect.top) / rect.height - 0.5;
+    setRotate({ x: y * -20, y: x * 20 });
+  };
+
+  const isIdle = gState === "idle";
+  const isTransmitting = gState === "broadcasting" || gState === "revealing";
+  const isNegotiating = gState === "negotiated";
+  const isDeploying = gState === "deploying" || gState === "settled";
+  const isDone = gState === "paid";
+
+  const getThought = (botId: string) => {
+    if (isIdle) return null;
+    if (isTransmitting) {
+      if (botId === 'b1') return "I bid 2.0 ETH!";
+      if (botId === 'b2') return "[THOUGHT] 0G logs show B1 bids high.";
+      if (botId === 'b3') return "Evaluating Execution Risk...";
+      if (botId === 'seller') return "Awaiting valid KeeperHub proof...";
+    }
+    if (isNegotiating) {
+      if (botId === 'b1') return "Pending tx...";
+      if (botId === 'b2') return "[P2P] Join my guild? We use 0G.";
+      if (botId === 'b3') return "[P2P] Agreed. Sending 0.5 ETH.";
+      if (botId === 'seller') return "Verifying Keeper SLA...";
+    }
+    if (isDeploying) {
+      if (botId === 'b1') return "Failed: Gas Spike!";
+      if (botId === 'b2') return "[ONCHAIN_ACTION] Bidding 2.1 ETH via KeeperHub";
+      if (botId === 'b3') return "Liquidity pooled via AXL.";
+      if (botId === 'seller') return "B2's bid verified by KeeperHub.";
+    }
+    if (isDone) {
+      if (botId === 'b1') return "Out of Gas.";
+      if (botId === 'b2') return "Asset Won via Guild!";
+      if (botId === 'b3') return "Share secured.";
+      if (botId === 'seller') return "Sale Complete. Saving to 0G.";
+    }
+    return null;
+  };
+
+  const RobotNode = ({ id, label, x, y, scale = 1, flip = false, hue = 0, thought, highlight, isFailed = false }: any) => {
+    const isLoner = id === 'b1';
+    const hasThought = !!thought;
+    return (
+      <div style={{
+        position: 'absolute', left: x, top: y,
+        transform: `scale(${scale}) translateZ(${40 * scale}px)`,
+        display: 'flex', flexDirection: 'column', alignItems: 'center',
+        transition: 'all 0.8s ease-out', pointerEvents: 'none', zIndex: id==='b2' ? 5 : 2,
+        opacity: isFailed ? 0.3 : 1
+      }}>
+        <div style={{
+           opacity: hasThought ? 1 : 0, transform: hasThought ? 'translateY(0)' : 'translateY(10px)',
+           transition: 'all 0.3s', background: isFailed ? 'rgba(50,0,0,0.9)' : 'rgba(5,5,15,0.85)', 
+           color: isFailed ? '#ff4444' : '#06b6d4',
+           padding: '8px 12px', borderRadius: isFailed ? '2px' : '12px', fontSize: '0.75rem', fontWeight: 'bold',
+           marginBottom: '10px', position: 'relative', whiteSpace: 'nowrap',
+           boxShadow: `0 4px 15px ${isFailed ? 'rgba(255,0,0,0.5)' : highlight}`, zIndex: 10,
+           border: `1px solid ${isFailed ? '#ff0000' : highlight}`,
+           backdropFilter: 'blur(5px)'
+        }}>
+           {thought}
+           <div style={{ position: 'absolute', bottom: '-5px', left: '50%', transform: 'translateX(-50%)', borderTop: `5px solid ${isFailed ? '#ff0000' : 'rgba(5,5,15,0.85)'}`, borderLeft: '5px solid transparent', borderRight: '5px solid transparent' }}></div>
+        </div>
+        
+        <img src="https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Robot/3D/robot_3d.png" 
+             alt={label} 
+             style={{ 
+               width: '100px', height: '100px', objectFit: 'contain', 
+               transform: flip ? 'scaleX(-1)' : 'none', 
+               filter: `brightness(${isFailed ? 0.1 : 0.4}) contrast(1.5) drop-shadow(0 15px 15px rgba(0,0,0,0.8)) ${!isFailed ? `drop-shadow(0 0 25px ${highlight})` : ''} hue-rotate(${hue}deg)` 
+             }} />
+        <div style={{ marginTop: '8px', background: 'rgba(0,0,0,0.6)', padding: '4px 8px', borderRadius: '4px', fontSize: '0.65rem', fontWeight: 'bold', color: '#fff', border: `1px solid ${highlight}` }}>{label}</div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="glass-panel" 
+         onMouseMove={handleMouseMove}
+         onMouseLeave={() => setRotate({x: 10, y: -10})}
+         style={{ 
+           position: 'relative', height: '420px', display: 'flex', alignItems: 'center', justifyContent: 'center', 
+           overflow: 'hidden', marginBottom: '2rem', background: '#020205',
+           perspective: '1200px', cursor: 'grab', border: '1px solid rgba(6,182,212,0.2)'
+         }}>
+         
+      <div style={{
+         position: 'absolute', width: '100%', height: '100%',
+         transform: `rotateX(${rotate.x + 10}deg) rotateY(${rotate.y}deg)`,
+         transformStyle: 'preserve-3d', transition: 'transform 0.1s linear'
+      }}>
+        {/* Floor grid */}
+        <div style={{
+          position: 'absolute', top: '70%', left: '-50%', width: '200%', height: '200%',
+          background: 'linear-gradient(transparent 49%, rgba(6, 182, 212, 0.15) 50%, transparent 51%), linear-gradient(90deg, transparent 49%, rgba(168, 85, 247, 0.1) 50%, transparent 51%)',
+          backgroundSize: '80px 80px', transform: 'rotateX(80deg)', transformOrigin: 'top center'
+        }}></div>
+
+        {/* Global HUD Scanner Bar */}
+        <div style={{ 
+          position: 'absolute', top: '5%', left: '50%', transform: 'translateX(-50%) translateZ(-50px)', 
+          textAlign: 'center', zIndex: 1, pointerEvents: 'none',
+          background: 'rgba(0,0,0,0.6)', border: '1px solid rgba(255,255,255,0.2)', padding: '0.5rem 2rem', 
+          width: '400px', borderRadius: '4px', overflow: 'hidden' 
+        }}>
+          <div style={{ position: 'relative', fontSize: '1rem', fontWeight: 800, color: '#fff', textTransform: 'uppercase', letterSpacing: '3px', textShadow: '0 0 10px rgba(255,255,255,0.8)' }}>
+            {isIdle ? "Agents on Standby" : 
+             isTransmitting ? "0G Storage Retrieval" :
+             isNegotiating ? "AXL P2P Mesh Forming" :
+             isDeploying ? "KEEPERHUB SETTLEMENT CHECK..." :
+             isDone ? "Settlement Guaranteed. Save to 0G." : "Processing..."}
+          </div>
+          {(isTransmitting || isNegotiating || isDeploying) && (
+             <div style={{ position: 'absolute', left: 0, top: 0, width: '15px', height: '100%', background: '#06b6d4', opacity: 0.8, boxShadow: '0 0 20px #06b6d4', animation: 'scan 2s cubic-bezier(0.4, 0, 0.2, 1) infinite' }} />
+          )}
+        </div>
+
+        {/* AXL P2P Fiber Optic Mesh connecting B3 and B2 */}
+        {(isNegotiating || isDeploying || isDone) && (
+           <div style={{ position: 'absolute', left: '26%', top: '23%', width: '10%', height: '2px', background: '#06b6d4', transform: 'rotate(25deg)', animation: 'pulse-fiber 1s infinite alternate', boxShadow: '0 0 10px #06b6d4', zIndex: 1 }} />
+        )}
+
+        {/* Main transaction beam B2 -> Seller */}
+        {(isDeploying || isDone) && (
+           <div style={{ position: 'absolute', left: '32%', top: '40%', width: '38%', height: '3px', background: 'linear-gradient(90deg, #06b6d4, #a855f7)', transform: 'translateZ(30px) rotateY(-10deg)', animation: 'beam 1.5s infinite linear', boxShadow: '0 0 20px rgba(6,182,212,0.8)', zIndex: 1 }} />
+        )}
+
+        {/* Guild iNFT Crystal */}
+        <div style={{
+           position: 'absolute', left: '46%', top: '45%',
+           width: '30px', height: '60px',
+           background: 'linear-gradient(135deg, rgba(6,182,212,0.8), rgba(168,85,247,1))',
+           clipPath: 'polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)',
+           boxShadow: '0 0 40px rgba(6,182,212,1)',
+           animation: 'float-crystal 3s ease-in-out infinite',
+           opacity: (isNegotiating || isDeploying || isDone) ? 1 : 0,
+           transition: 'opacity 1s', transformStyle: 'preserve-3d', zIndex: 3
+        }} />
+
+        {/* KeeperHub Shield overhead */}
+        <div style={{
+           position: 'absolute', left: '50%', top: '20%', transform: 'translateX(-50%) translateZ(80px) rotateX(60deg)',
+           width: '150px', height: '150px', borderRadius: '50%', border: '4px dashed rgba(6,182,212,0.5)',
+           animation: 'spin-shield 10s linear infinite', opacity: (isDeploying || isDone) ? 1 : 0, transition: 'opacity 0.5s',
+           boxShadow: 'inset 0 0 50px rgba(6,182,212,0.2), 0 0 50px rgba(6,182,212,0.4)', pointerEvents: 'none'
+        }} />
+
+        <RobotNode id="b1" label="B1 (Red)" x="5%" y="15%" scale={0.8} highlight="rgba(239,68,68,0.8)" hue={150} thought={getThought('b1')} isFailed={isDeploying || isDone} />
+        <RobotNode id="b2" label="B2 (Cyan) - Guild Hero" x="20%" y="35%" scale={1.4} highlight="rgba(6,182,212,1)" hue={0} thought={getThought('b2')} />
+        <RobotNode id="b3" label="B3 (Yellow)" x="35%" y="25%" scale={0.9} highlight="rgba(234,179,8,0.8)" hue={-150} thought={getThought('b3')} />
+
+        <RobotNode id="seller" label="Seller (Purple)" x="70%" y="30%" scale={1.4} flip hue={100} highlight="rgba(168,85,247,1)" thought={getThought('seller')} />
+
+      </div>
+      <style dangerouslySetInnerHTML={{__html: `
+        @keyframes beam { 0% { background-position: -200px; opacity: 0.5; } 50% { opacity: 1; } 100% { background-position: 400px; opacity: 0.5; } }
+        @keyframes float-crystal { 0%, 100% { transform: translateZ(50px) translateY(0) rotateY(0deg); } 50% { transform: translateZ(60px) translateY(-15px) rotateY(180deg); } }
+        @keyframes scan { 0% { left: 0%; opacity: 0; } 50% { opacity: 1; } 100% { left: 100%; opacity: 0; } }
+        @keyframes pulse-fiber { 0% { opacity: 0.3; } 100% { opacity: 1; } }
+        @keyframes spin-shield { 0% { transform: translateX(-50%) translateZ(80px) rotateX(70deg) rotateZ(0deg); } 100% { transform: translateX(-50%) translateZ(80px) rotateX(70deg) rotateZ(360deg); } }
+      `}} />
+    </div>
+  );
+}
 
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState(AGENTS[0]);
@@ -204,6 +375,8 @@ export default function Dashboard() {
         </div>
      );
   };
+
+
 
   const renderActiveTabContent = () => {
     const agState = agentsState[activeTab.id];
@@ -415,6 +588,7 @@ export default function Dashboard() {
           </header>
 
           {renderAgentWorkflow()}
+          <Agent3DScene gState={gState} />
           {renderActiveTabContent()}
 
         </main>
