@@ -9,17 +9,7 @@ import { defineChain } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { ethers } from "ethers";
 import { Indexer, KvClient } from "@0gfoundation/0g-ts-sdk";
-
-export const gensynTestnet = defineChain({
-  id: 42069,
-  name: "Gensyn Devnet",
-  network: "gensyn-devnet",
-  nativeCurrency: { name: "Gensyn Ether", symbol: "GETH", decimals: 18 },
-  rpcUrls: {
-    default: { http: ["https://rpc.devnet.gensyn.ai"] },
-    public: { http: ["https://rpc.devnet.gensyn.ai"] },
-  },
-});
+import { gensyn } from "viem/chains";
 
 const FACTORY_ABI = [
   {
@@ -157,11 +147,11 @@ export async function deployCoalition(args: {
   const account = privateKeyToAccount(cfg.privateKey);
   const wallet = createWalletClient({
     account,
-    chain: gensynTestnet,
+    chain: gensyn,
     transport: http(cfg.rpcUrl),
   });
   const publicClient = createPublicClient({
-    chain: gensynTestnet,
+    chain: gensyn,
     transport: http(cfg.rpcUrl),
   });
 
@@ -206,11 +196,11 @@ export async function fundCoalitionForBuyer(args: {
 
   const wallet = createWalletClient({
     account,
-    chain: gensynTestnet,
+    chain: gensyn,
     transport: http(cfg.rpcUrl),
   });
   const publicClient = createPublicClient({
-    chain: gensynTestnet,
+    chain: gensyn,
     transport: http(cfg.rpcUrl),
   });
 

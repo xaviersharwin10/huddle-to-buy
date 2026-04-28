@@ -6,7 +6,7 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import { createWalletClient, http } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
-import { gensynTestnet } from "./chain.js";
+import { gensyn } from "viem/chains";
 
 // Initialize the MCP server
 const server = new Server(
@@ -52,12 +52,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const privateKey = (process.env.PRIVATE_KEY || process.env.KEEPER_PRIVATE_KEY) as `0x${string}`;
       if (!privateKey) throw new Error("Missing KEEPER_PRIVATE_KEY");
 
-      const rpcUrl = process.env.RPC_URL || "https://rpc.devnet.gensyn.ai";
+      const rpcUrl = process.env.RPC_URL || "https://gensyn-mainnet.g.alchemy.com/public";
       
       const account = privateKeyToAccount(privateKey);
       const wallet = createWalletClient({
         account,
-        chain: gensynTestnet,
+        chain: gensyn,
         transport: http(rpcUrl),
       });
 
